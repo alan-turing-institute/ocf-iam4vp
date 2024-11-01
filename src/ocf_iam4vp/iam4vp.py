@@ -49,6 +49,7 @@ def stride_generator(N, reverse=False):
 
 class Encoder(nn.Module):
     def __init__(self, C_in, C_hid, N_S):
+        """Encode data from the full phase space into a reduced latent space"""
         super(Encoder, self).__init__()
         strides = stride_generator(N_S)
         self.enc = nn.Sequential(
@@ -57,6 +58,16 @@ class Encoder(nn.Module):
         )
 
     def forward(self, x):  # B*4, 3, 128, 128
+        """
+        Transformation summary
+
+        Inputs:
+            x: (batch_size * history_steps, channels, height, width)
+
+        Outputs:
+            latent: (batch_size, hidden_spatial, height_latent, width_latent)
+            enc1: (batch_size, hidden_spatial, height, width)
+        """
         enc1 = self.enc[0](x)
         latent = enc1
         for i in range(1, len(self.enc)):
