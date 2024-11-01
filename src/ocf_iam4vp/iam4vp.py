@@ -83,20 +83,32 @@ class LP(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(self, C_hid, C_out, N_S):
+        """Decode data from the reduced latent space into the full phase space"""
         super(Decoder, self).__init__()
         strides = stride_generator(N_S, reverse=True)
         self.dec = nn.Sequential(
             *[ConvSC(C_hid, C_hid, stride=s, transpose=True) for s in strides[:-1]],
             ConvSC(2 * C_hid, C_hid, stride=strides[-1], transpose=True),
         )
-        self.readout = nn.Conv2d(640, 64, 1)
+        self.readout = nn.Conv2d(C_hid, C_out, 1)
 
     def forward(self, hid, enc1=None):
+        """
+        Transformation summary
+
+        Inputs:
+            hid: (batch_size * history_steps, hidden_spatial, height_latent, width_latent)
+            enc1: (batch_size * history_steps, hidden_spatial, height, width)
+
+        Outputs:
+            (batch_size * history_steps, channels, height, width)
+        """
+        # Deconvolve hid back to full size
         for i in range(0, len(self.dec) - 1):
             hid = self.dec[i](hid)
+        # Crop hid to the same size as enc1
+        hid = hid[:, :, : enc1.shape[-2], : enc1.shape[-1]]
         Y = self.dec[-1](torch.cat([hid, enc1], dim=1))
-        ys = Y.shape
-        Y = Y.reshape(int(ys[0] / 10), int(ys[1] * 10), 64, 64)
         Y = self.readout(Y)
         return Y
 
