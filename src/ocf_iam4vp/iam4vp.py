@@ -103,23 +103,29 @@ class Decoder(nn.Module):
 
 class Predictor(nn.Module):
     def __init__(self, channel_in, channel_hid, N_T):
+        """Predict in latent space using ConvNeXt blocks"""
         super(Predictor, self).__init__()
-
-        self.N_T = N_T
-        st_block = [ConvNeXt_bottle(dim=channel_in)]
-        for i in range(0, N_T):
-            st_block.append(ConvNeXt_block(dim=channel_in))
-
-        self.st_block = nn.Sequential(*st_block)
+        self.st_block = nn.Sequential(
+            ConvNeXt_bottle(dim=channel_in),
+            *[ConvNeXt_block(dim=channel_in) for _ in range(N_T)],
+        )
 
     def forward(self, x, time_emb):
+        """
+        Transformation summary
+
+        Inputs:
+            x: (batch_size, history_steps * 2, hidden_spatial, height_latent, width_latent)
+            time_emb: (batch_size, hidden_spatial)
+        Outputs:
+            (batch_size, history_steps, hidden_spatial, height_latent, width_latent)
+        """
         B, T, C, H, W = x.shape
         x = x.reshape(B, T * C, H, W)
         z = self.st_block[0](x, time_emb)
-        for i in range(1, self.N_T):
+        for i in range(1, len(self.st_block)):
             z = self.st_block[i](z, time_emb)
-
-        y = z.reshape(B, int(T / 2), C, H, W)
+        y = z.reshape(B, -1, C, H, W)
         return y
 
 
