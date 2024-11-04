@@ -46,7 +46,7 @@ class TimeMLP(nn.Module):
     """
 
     def __init__(self, dim):
-        super(TimeMLP, self).__init__()
+        super().__init__()
         self.sinusoidaposemb = SinusoidalPosEmb(dim)
         self.linear1 = nn.Linear(dim, dim * 4)
         self.gelu = nn.GELU()
@@ -133,7 +133,7 @@ class BasicConv2d(nn.Module):
         transpose=False,
         act_norm=False,
     ):
-        super(BasicConv2d, self).__init__()
+        super().__init__()
         self.act_norm = act_norm
         if transpose is True:
             self.conv = nn.Sequential(
@@ -192,7 +192,7 @@ class ConvSC(nn.Module):
     """
 
     def __init__(self, C_in, C_out, stride, transpose=False, act_norm=True):
-        super(ConvSC, self).__init__()
+        super().__init__()
         if stride == 1:
             transpose = False
         self.conv = BasicConv2d(

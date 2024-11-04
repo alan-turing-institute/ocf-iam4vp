@@ -22,7 +22,7 @@ class Encoder(nn.Module):
     """
 
     def __init__(self, C_in, C_hid, N_S):
-        super(Encoder, self).__init__()
+        super().__init__()
         strides = stride_generator(N_S)
         self.enc = nn.Sequential(
             ConvSC(C_in, C_hid, stride=strides[0]),
@@ -55,7 +55,7 @@ class LearnedPrior(nn.Module):
     """
 
     def __init__(self, C_in, C_hid, N_S):
-        super(LearnedPrior, self).__init__()
+        super().__init__()
         strides = stride_generator(N_S)
         self.enc = nn.Sequential(
             ConvSC(C_in, C_hid, stride=strides[0]),
@@ -88,7 +88,7 @@ class Decoder(nn.Module):
     """
 
     def __init__(self, C_hid, C_out, N_S):
-        super(Decoder, self).__init__()
+        super().__init__()
         strides = stride_generator(N_S, reverse=True)
         self.dec = nn.Sequential(
             *[ConvSC(C_hid, C_hid, stride=s, transpose=True) for s in strides[:-1]],
@@ -125,7 +125,7 @@ class Predictor(nn.Module):
     """
 
     def __init__(self, channel_hid, N_T):
-        super(Predictor, self).__init__()
+        super().__init__()
         self.st_block = nn.Sequential(
             ConvNeXt_bottle(dim=channel_hid),
             *[ConvNeXt_block(dim=channel_hid) for _ in range(N_T)],
@@ -197,7 +197,7 @@ class IAM4VP(nn.Module):
     """
 
     def __init__(self, shape_in, hid_S=64, hid_T=512, N_S=4, N_T=6):
-        super(IAM4VP, self).__init__()
+        super().__init__()
         T, C, H, W = shape_in
         self.time_mlp = TimeMLP(dim=hid_S)
         self.enc = Encoder(C, hid_S, N_S)
