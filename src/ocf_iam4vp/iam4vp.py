@@ -9,14 +9,29 @@ from .modules import Attention, ConvNeXt_block, ConvNeXt_bottle, ConvSC
 
 
 class SinusoidalPosEmb(nn.Module):
-    def __init__(self, dim):
+    def __init__(self, dim, theta=10000):
+        """
+        Sinusoidal positional embedding
+
+        from https://github.com/lucidrains/denoising-diffusion-pytorch
+        """
         super().__init__()
         self.dim = dim
+        self.theta = theta
 
     def forward(self, x):
+        """
+        Transformation summary
+
+        Inputs:
+            x: (batch_size)
+
+        Outputs:
+            (batch_size, hidden_spatial)
+        """
         device = x.device
         half_dim = self.dim // 2
-        emb = math.log(10000) / (half_dim - 1)
+        emb = math.log(self.theta) / (half_dim - 1)
         emb = torch.exp(torch.arange(half_dim, device=device) * -emb)
         emb = x[:, None] * emb[None, :]
         emb = torch.cat((emb.sin(), emb.cos()), dim=-1)
