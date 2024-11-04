@@ -188,22 +188,29 @@ class IAM4VP(nn.Module):
         Outputs:
             (batch_size, channels, height, width)
         """
+
+        # Combine batch and time information
         B, T, C, H, W = x_raw.shape
         x = x_raw.contiguous().view(B * T, C, H, W)
-        time_emb = self.time_mlp(t)
+
+        # Encode to latent space
         embed, skip = self.enc(x)
-        mask_token = self.mask_token.repeat(B, 1, 1, 1, 1)
-
-        for idx, pred in enumerate(y_raw):
-            embed2, _ = self.lp(pred)
-            mask_token[:, idx, :, :, :] = embed2
-
         _, C_, H_, W_ = embed.shape
 
-        z = embed.view(B, T, C_, H_, W_)
-        z2 = mask_token
-        z = torch.cat([z, z2], dim=1)
-        hid = self.hid(z, time_emb)
+        # Embed future frames via learned prior
+        mask_token = self.mask_token.repeat(B, 1, 1, 1, 1)
+        for idx, pred in enumerate(y_raw):
+            embed_priors, _ = self.lp(pred)
+            mask_token[:, idx, :, :, :] = embed_priors
+
+        # Combine data and priors in latent space
+        x_latent = embed.view(B, T, C_, H_, W_)
+        priors_latent = mask_token
+        combined_latent = torch.cat([x_latent, priors_latent], dim=1)
+
+        # Run predictor on combined latent data + time embedding
+        time_emb = self.time_mlp(t)
+        hid = self.hid(combined_latent, time_emb)
         hid = hid.reshape(B * T, C_, H_, W_)
 
         # Decode the output
