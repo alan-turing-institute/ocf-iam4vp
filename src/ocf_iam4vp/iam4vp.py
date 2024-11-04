@@ -75,9 +75,10 @@ class Encoder(nn.Module):
         return latent, enc1
 
 
-class LP(nn.Module):
+class LearnedPrior(nn.Module):
     def __init__(self, C_in, C_hid, N_S):
-        super(LP, self).__init__()
+        """Encode learned prior from the full phase space into a reduced latent space"""
+        super(LearnedPrior, self).__init__()
         strides = stride_generator(N_S)
         self.enc = nn.Sequential(
             ConvSC(C_in, C_hid, stride=strides[0]),
@@ -85,6 +86,16 @@ class LP(nn.Module):
         )
 
     def forward(self, x):  # B*4, 3, 128, 128
+        """
+        Transformation summary
+
+        Inputs:
+            x: (batch_size, channels, height, width)
+
+        Outputs:
+            latent: (batch_size, hidden_spatial, height_latent, width_latent)
+            enc1: (batch_size, hidden_spatial, height, width)
+        """
         enc1 = self.enc[0](x)
         latent = enc1
         for i in range(1, len(self.enc)):
@@ -163,7 +174,7 @@ class IAM4VP(nn.Module):
         self.attn = Attention(64)
         self.readout = nn.Conv2d(64, 1, 1)
         self.mask_token = nn.Parameter(torch.zeros(10, hid_S, 16, 16))
-        self.lp = LP(C, hid_S, N_S)
+        self.lp = LearnedPrior(C, hid_S, N_S)
 
     def forward(self, x_raw, y_raw=None, t=None):
         B, T, C, H, W = x_raw.shape
