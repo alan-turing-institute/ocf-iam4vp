@@ -200,9 +200,11 @@ class IAM4VP(nn.Module):
         self.enc = Encoder(C, hid_S, N_S)
         self.hid = Predictor(T * hid_S, hid_T, N_T)
         self.dec = Decoder(hid_S, C, N_S)
-        self.attn = Attention(64)
-        self.readout = nn.Conv2d(64, 1, 1)
-        self.mask_token = nn.Parameter(torch.zeros(10, hid_S, 16, 16))
+        self.attn = Attention(C * T)
+        self.readout = nn.Conv2d(C * T, C, 1)
+        self.mask_token = nn.Parameter(
+            torch.zeros(T, hid_S, -(H // -N_S), -(W // -N_S))
+        )
         self.lp = LearnedPrior(C, hid_S, N_S)
 
     def forward(self, x_raw, y_raw=None, t=None):
@@ -224,7 +226,15 @@ class IAM4VP(nn.Module):
         hid = self.hid(z, time_emb)
         hid = hid.reshape(B * T, C_, H_, W_)
 
+        # Decode the output
         Y = self.dec(hid, skip)
+
+        # Move the history steps dimension onto channels
+        Y = Y.reshape(B, C * T, H, W)
+
+        # Run the attention step
         Y = self.attn(Y)
+
+        # Readout to the correct shape
         Y = self.readout(Y)
         return Y
