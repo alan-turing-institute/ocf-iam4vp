@@ -14,4 +14,5 @@ dependencies = [
     "timm",
     "torch",
     "tqdm",
+    "transformers",
 ]
