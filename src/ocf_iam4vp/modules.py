@@ -73,10 +73,15 @@ class TimeMLP(nn.Module):
 
 class LayerNorm(nn.Module):
     """
-    LayerNorm that supports two data formats: channels_last (default) or channels_first.
-    The ordering of the dimensions in the inputs. channels_last corresponds to inputs with
-    shape (batch_size, height, width, channels) while channels_first corresponds to inputs
-    with shape (batch_size, channels, height, width).
+    LayerNorm that supports two data formats depending on the ordering of the dimensions.
+
+    channels_last (default):
+        (batch_size, height, width, channels)
+
+    channels_first:
+        (batch_size, channels, height, width).
+
+    from https://github.com/seominseok0429/Implicit-Stacked-Autoregressive-Model-for-Video-Prediction
     """
 
     def __init__(self, normalized_shape, eps=1e-6, data_format="channels_last"):
@@ -113,7 +118,11 @@ class LayerNorm(nn.Module):
 
 
 class BasicConv2d(nn.Module):
-    """Basic 2D convolutional layer from https://github.com/A4Bio/SimVP"""
+    """
+    Basic 2D convolutional layer
+
+    from https://github.com/A4Bio/SimVP
+    """
 
     def __init__(
         self,
@@ -178,7 +187,11 @@ class BasicConv2d(nn.Module):
 
 
 class ConvSC(nn.Module):
-    """Basic 2D convolutional layer from https://github.com/A4Bio/SimVP"""
+    """
+    Basic 2D convolutional layer
+
+    from https://github.com/A4Bio/SimVP
+    """
 
     def __init__(self, C_in, C_out, stride, transpose=False, act_norm=True):
         super(ConvSC, self).__init__()

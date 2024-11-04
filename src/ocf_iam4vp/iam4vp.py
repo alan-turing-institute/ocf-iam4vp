@@ -15,8 +15,13 @@ def stride_generator(N, reverse=False):
 
 
 class Encoder(nn.Module):
+    """
+    Spatial encoder
+
+    Transform data from the full phase space into a reduced latent space
+    """
+
     def __init__(self, C_in, C_hid, N_S):
-        """Encode data from the full phase space into a reduced latent space"""
         super(Encoder, self).__init__()
         strides = stride_generator(N_S)
         self.enc = nn.Sequential(
@@ -43,8 +48,13 @@ class Encoder(nn.Module):
 
 
 class LearnedPrior(nn.Module):
+    """
+    LearnedPrior
+
+    Transform priors from the full phase space into a reduced latent space
+    """
+
     def __init__(self, C_in, C_hid, N_S):
-        """Encode learned prior from the full phase space into a reduced latent space"""
         super(LearnedPrior, self).__init__()
         strides = stride_generator(N_S)
         self.enc = nn.Sequential(
@@ -71,8 +81,13 @@ class LearnedPrior(nn.Module):
 
 
 class Decoder(nn.Module):
+    """
+    Decoder
+
+    Transform data from the reduced latent space into the full phase space
+    """
+
     def __init__(self, C_hid, C_out, N_S):
-        """Decode data from the reduced latent space into the full phase space"""
         super(Decoder, self).__init__()
         strides = stride_generator(N_S, reverse=True)
         self.dec = nn.Sequential(
@@ -103,8 +118,14 @@ class Decoder(nn.Module):
 
 
 class Predictor(nn.Module):
+    """
+    Spatio-temporal predictor
+
+    Predict in latent space using ConvNeXt blocks
+    """
+
     def __init__(self, channel_in, channel_hid, N_T):
-        """Predict in latent space using ConvNeXt blocks"""
+
         super(Predictor, self).__init__()
         self.st_block = nn.Sequential(
             ConvNeXt_bottle(dim=channel_in),
@@ -131,6 +152,17 @@ class Predictor(nn.Module):
 
 
 class IAM4VP(nn.Module):
+    """
+    IAM4VP model
+
+    - Spatial encoder to a latent phase space
+    - Combine with future frame information
+    - Combine with sinusoidal time MLP
+    - Run spatio-temporal predictor
+    - Spatial decoder to original phase space
+    - Spatial temporal refinement
+    """
+
     def __init__(self, shape_in, hid_S=64, hid_T=512, N_S=4, N_T=6):
         super(IAM4VP, self).__init__()
         T, C, H, W = shape_in
