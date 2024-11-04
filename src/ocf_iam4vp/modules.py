@@ -26,6 +26,16 @@ class LayerNorm(nn.Module):
         self.normalized_shape = (normalized_shape,)
 
     def forward(self, x):
+        """
+        Transformation summary
+
+        Inputs:
+            x: (batch_size, hidden_spatial * history_steps, height_latent, width_latent)
+            time_emb: (batch_size, hidden_spatial)
+
+        Outputs:
+            (batch_size, hidden_spatial * history_steps, height_latent, width_latent)
+        """
         if self.data_format == "channels_last":
             return F.layer_norm(
                 x, self.normalized_shape, self.weight, self.bias, self.eps
@@ -39,6 +49,7 @@ class LayerNorm(nn.Module):
 
 
 class BasicConv2d(nn.Module):
+    """Basic 2D convolutional layer from https://github.com/A4Bio/SimVP"""
     def __init__(
         self,
         in_channels,
@@ -86,6 +97,15 @@ class BasicConv2d(nn.Module):
             nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
+        """
+        Transformation summary
+
+        Inputs:
+            x: (batch_size * history_steps, channels_in, height, width)
+
+        Outputs:
+            (batch_size * history_steps, channels_out, height, width)
+        """
         y = self.conv(x)
         if self.act_norm:
             y = self.act(self.norm(y))
@@ -93,6 +113,7 @@ class BasicConv2d(nn.Module):
 
 
 class ConvSC(nn.Module):
+    """Basic 2D convolutional layer from https://github.com/A4Bio/SimVP"""
     def __init__(self, C_in, C_out, stride, transpose=False, act_norm=True):
         super(ConvSC, self).__init__()
         if stride == 1:
@@ -108,8 +129,16 @@ class ConvSC(nn.Module):
         )
 
     def forward(self, x):
-        y = self.conv(x)
-        return y
+        """
+        Transformation summary
+
+        Inputs:
+            x: (batch_size * history_steps, channels_in, height, width)
+
+        Outputs:
+            (batch_size * history_steps, channels_out, height, width)
+        """
+        return self.conv(x)
 
 
 class ConvNeXt_block(nn.Module):
@@ -144,6 +173,16 @@ class ConvNeXt_block(nn.Module):
         self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
 
     def forward(self, x, time_emb=None):
+        """
+        Transformation summary
+
+        Inputs:
+            x: (batch_size, hidden_spatial * history_steps, height_latent, width_latent)
+            time_emb: (batch_size, hidden_spatial)
+
+        Outputs:
+            (batch_size, hidden_spatial * history_steps, height_latent, width_latent)
+        """
         input = x
         time_emb = self.mlp(time_emb)
         x = self.dwconv(x) + rearrange(time_emb, "b c -> b c 1 1")
@@ -196,6 +235,16 @@ class ConvNeXt_bottle(nn.Module):
         self.res_conv = nn.Conv2d(dim * 2, dim, 1)
 
     def forward(self, x, time_emb=None):
+        """
+        Transformation summary
+
+        Inputs:
+            x: (batch_size, 2 * hidden_spatial * history_steps, height_latent, width_latent)
+            time_emb: (batch_size, hidden_spatial)
+
+        Outputs:
+            (batch_size, hidden_spatial * history_steps, height_latent, width_latent)
+        """
         input = x
         time_emb = self.mlp(time_emb)
         x = self.dwconv(x) + rearrange(time_emb, "b c -> b c 1 1")
@@ -213,6 +262,8 @@ class ConvNeXt_bottle(nn.Module):
 
 
 class LKA(nn.Module):
+    """Large Kernel Attention from https://github.com/seominseok0429/Implicit-Stacked-Autoregressive-Model-for-Video-Prediction"""
+
     def __init__(self, dim):
         super().__init__()
         self.conv0 = nn.Conv2d(dim, dim, 5, padding=2, groups=dim)
@@ -222,6 +273,15 @@ class LKA(nn.Module):
         self.conv1 = nn.Conv2d(dim, dim, 1)
 
     def forward(self, x):
+        """
+        Transformation summary
+
+        Inputs:
+            x: (batch_size, channel_dim, height_dim, width_dim)
+
+        Outputs:
+            (batch_size, channel_dim, height_dim, width_dim)
+        """
         u = x.clone()
         attn = self.conv0(x)
         attn = self.conv_spatial(attn)
@@ -231,6 +291,7 @@ class LKA(nn.Module):
 
 
 class Attention(nn.Module):
+    """Attention from https://github.com/seominseok0429/Implicit-Stacked-Autoregressive-Model-for-Video-Prediction"""
     def __init__(self, d_model):
         super().__init__()
 
@@ -240,6 +301,15 @@ class Attention(nn.Module):
         self.proj_2 = nn.Conv2d(d_model, d_model, 1)
 
     def forward(self, x):
+        """
+        Transformation summary
+
+        Inputs:
+            x: (batch_size, channels * history_steps, height, width)
+
+        Outputs:
+            (batch_size, channels * history_steps, height, width)
+        """
         shorcut = x.clone()
         x = self.proj_1(x)
         x = self.activation(x)
@@ -250,17 +320,18 @@ class Attention(nn.Module):
 
 
 class Bottleneck(nn.Module):
-    """Bottleneck module
-    Args:
-        inplanes (int): no. input channels
-        planes (int): no. output channels
-        stride (int): stride
-        downsample (nn.Module): downsample module
-    """
+    """Bottleneck module"""
 
     expansion = 4
 
     def __init__(self, inplanes, planes, stride=1, downsample=None):
+        """
+        Args:
+            inplanes (int): no. input channels
+            planes (int): no. output channels
+            stride (int): stride
+            downsample (nn.Module): downsample module
+        """
         super(Bottleneck, self).__init__()
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
         self.bn1 = LayerNorm(planes, eps=1e-6, data_format="channels_first")

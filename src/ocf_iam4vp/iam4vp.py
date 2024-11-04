@@ -208,6 +208,16 @@ class IAM4VP(nn.Module):
         self.lp = LearnedPrior(C, hid_S, N_S)
 
     def forward(self, x_raw, y_raw=None, t=None):
+        """
+        Transformation summary
+
+        Inputs:
+            x: (batch_size, history_steps, channels, height, width)
+            y_raw: N * (batch_size, channels, height, width)
+
+        Outputs:
+            (batch_size, channels, height, width)
+        """
         B, T, C, H, W = x_raw.shape
         x = x_raw.contiguous().view(B * T, C, H, W)
         time_emb = self.time_mlp(t)
