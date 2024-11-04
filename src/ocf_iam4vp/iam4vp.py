@@ -29,7 +29,7 @@ class Encoder(nn.Module):
             *[ConvSC(C_hid, C_hid, stride=s) for s in strides[1:]],
         )
 
-    def forward(self, x):  # B*4, 3, 128, 128
+    def forward(self, x):
         """
         Transformation summary
 
@@ -209,9 +209,8 @@ class IAM4VP(nn.Module):
         self.enc = Encoder(C, C_latent, N_S)
         self.hid = Predictor(T, C_latent, N_T)
         self.dec = Decoder(C_latent, C, N_S)
-        self.mask_token = nn.Parameter(
-            torch.zeros(T, C_latent, -(H // -N_S), -(W // -N_S))
-        )
+        shape_latent = self.enc(torch.randn(shape_in))[0].shape # get latent shape
+        self.mask_token = nn.Parameter(torch.zeros(shape_latent))
         self.lp = LearnedPrior(C, C_latent, N_S)
         self.str = SpatioTemporalRefinement(C, T)
 
