@@ -27,8 +27,8 @@ def train(
     batch_size: int,
     device: str,
     forecast_steps: int,
+    hidden_channels_space: int,
     history_steps: int,
-    latent_space_channels: int,
     num_convolutions_space: int,
     num_convolutions_time: int,
     num_epochs: int,
@@ -61,7 +61,7 @@ def train(
     # Create the model
     model = IAM4VP(
         (history_steps, NUM_CHANNELS, IMAGE_SIZE_TUPLE[0], IMAGE_SIZE_TUPLE[1]),
-        C_latent=latent_space_channels,
+        hid_S=hidden_channels_space,
         N_S=num_convolutions_space,
         N_T=num_convolutions_time,
     )
@@ -131,9 +131,9 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size", type=int, help="Batch size", default=2)
     parser.add_argument("--data-path", type=str, help="Path to the input data")
     parser.add_argument(
-        "--latent-space-channels",
+        "--hidden-channels-space",
         type=int,
-        help="Number of latent space channels",
+        help="Number of spatial hidden channels",
         default=64,
     )
     parser.add_argument(
@@ -181,8 +181,8 @@ if __name__ == "__main__":
             batch_size=args.batch_size,
             device=device,
             forecast_steps=args.num_forecast_steps,
+            hidden_channels_space=args.hidden_channels_space,
             history_steps=args.num_history_steps,
-            latent_space_channels=args.latent_space_channels,
             num_convolutions_space=args.num_convolutions_space,
             num_convolutions_time=args.num_convolutions_time,
             num_epochs=args.num_epochs,

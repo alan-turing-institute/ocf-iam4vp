@@ -126,13 +126,13 @@ class Predictor(nn.Module):
     Predict in latent space using ConvNeXt blocks
     """
 
-    def __init__(self, history_steps: int, C_latent: int, N_T: int) -> None:
+    def __init__(self, history_steps: int, hid_S: int, N_T: int) -> None:
         super().__init__()
-        C_input = history_steps * C_latent
+        C_input = history_steps * hid_S
         self.st_block = nn.Sequential(
-            ConvNextBottle(dim=C_input, channels_hid=C_latent),
+            ConvNextBottle(dim=C_input, channels_hid=hid_S),
             *[
-                ConvNextBlock(dim=C_input, channels_hid=C_latent)
+                ConvNextBlock(dim=C_input, channels_hid=hid_S)
                 for _ in range(N_T - 1)
             ],
         )
@@ -202,24 +202,24 @@ class IAM4VP(nn.Module):
     - Spatial temporal refinement (STR)
 
     Parameters:
-    - C_latent: number of channels in latent space
+    - hid_S: number of spatial hidden channels
     - N_S: number of spatial convolution layers
     - N_T: number of temporal convolution layers
     """
 
     def __init__(
-        self, shape_in: torch.Size, C_latent: int = 64, N_S: int = 4, N_T: int = 6
+        self, shape_in: torch.Size, hid_S: int = 64, N_S: int = 4, N_T: int = 6
     ):
         super().__init__()
         T, C, H, W = shape_in
-        self.time_mlp = TimeMLP(dim=C_latent)
-        self.enc = Encoder(C, C_latent, N_S)
-        self.hid = Predictor(T, C_latent, N_T)
-        self.dec = Decoder(C_latent, C, N_S)
+        self.time_mlp = TimeMLP(dim=hid_S)
+        self.enc = Encoder(C, hid_S, N_S)
+        self.hid = Predictor(T, hid_S, N_T)
+        self.dec = Decoder(hid_S, C, N_S)
         self.mask_token = nn.Parameter(
             torch.zeros_like(self.enc(torch.randn(shape_in))[0])
         )
-        self.lp = LearnedPrior(C, C_latent, N_S)
+        self.lp = LearnedPrior(C, hid_S, N_S)
         self.str = SpatioTemporalRefinement(C, T)
 
     def forward(
