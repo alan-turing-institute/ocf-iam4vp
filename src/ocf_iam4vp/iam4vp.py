@@ -38,15 +38,29 @@ class SinusoidalPosEmb(nn.Module):
         return emb
 
 
-class Time_MLP(nn.Module):
+class TimeMLP(nn.Module):
     def __init__(self, dim):
-        super(Time_MLP, self).__init__()
+        """
+        Time multilayer perceptron
+
+        from https://github.com/lucidrains/denoising-diffusion-pytorch
+        """
+        super(TimeMLP, self).__init__()
         self.sinusoidaposemb = SinusoidalPosEmb(dim)
         self.linear1 = nn.Linear(dim, dim * 4)
         self.gelu = nn.GELU()
         self.linear2 = nn.Linear(dim * 4, dim)
 
     def forward(self, x):
+        """
+        Transformation summary
+
+        Inputs:
+            x: (batch_size)
+
+        Outputs:
+            (batch_size, hidden_spatial)
+        """
         x = self.sinusoidaposemb(x)
         x = self.linear1(x)
         x = self.gelu(x)
@@ -182,7 +196,7 @@ class IAM4VP(nn.Module):
     def __init__(self, shape_in, hid_S=64, hid_T=512, N_S=4, N_T=6):
         super(IAM4VP, self).__init__()
         T, C, H, W = shape_in
-        self.time_mlp = Time_MLP(dim=64)
+        self.time_mlp = TimeMLP(dim=hid_S)
         self.enc = Encoder(C, hid_S, N_S)
         self.hid = Predictor(T * hid_S, hid_T, N_T)
         self.dec = Decoder(hid_S, C, N_S)
