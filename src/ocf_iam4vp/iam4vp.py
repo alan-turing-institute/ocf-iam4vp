@@ -209,7 +209,7 @@ class IAM4VP(nn.Module):
 
     def forward(self, x_raw, y_raw=None, t=None):
         B, T, C, H, W = x_raw.shape
-        x = x_raw.view(B * T, C, H, W)
+        x = x_raw.contiguous().view(B * T, C, H, W)
         time_emb = self.time_mlp(t)
         embed, skip = self.enc(x)
         mask_token = self.mask_token.repeat(B, 1, 1, 1, 1)
