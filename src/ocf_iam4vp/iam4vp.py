@@ -8,6 +8,14 @@ from torch import nn
 from .modules import Attention, ConvNeXt_block, ConvNeXt_bottle, ConvSC
 
 
+def stride_generator(N, reverse=False):
+    strides = [1, 2] * N
+    if reverse:
+        return list(reversed(strides[:N]))
+    else:
+        return strides[:N]
+
+
 class SinusoidalPosEmb(nn.Module):
     def __init__(self, dim, theta=10000):
         """
@@ -66,14 +74,6 @@ class TimeMLP(nn.Module):
         x = self.gelu(x)
         x = self.linear2(x)
         return x
-
-
-def stride_generator(N, reverse=False):
-    strides = [1, 2] * 10
-    if reverse:
-        return list(reversed(strides[:N]))
-    else:
-        return strides[:N]
 
 
 class Encoder(nn.Module):
