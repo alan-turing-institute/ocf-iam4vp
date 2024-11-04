@@ -157,7 +157,6 @@ class ConvNeXt_block(nn.Module):
     def __init__(self, dim, drop_path=0.0, layer_scale_init_value=1e-6):
         super().__init__()
         self.mlp = nn.Sequential(nn.GELU(), nn.Linear(64, dim))
-        # self.dwconv = nn.Conv2d(dim, dim, kernel_size=7, padding=3, groups=dim) # depthwise conv
         self.dwconv = LKA(dim)
         self.norm = LayerNorm(dim, eps=1e-6)
         self.pwconv1 = nn.Linear(
@@ -214,12 +213,10 @@ class ConvNeXt_bottle(nn.Module):
 
     def __init__(self, dim, drop_path=0.0, layer_scale_init_value=1e-6):
         super().__init__()
-
         self.mlp = nn.Sequential(nn.GELU(), nn.Linear(64, dim))
         self.dwconv = nn.Conv2d(
             dim * 2, dim, kernel_size=7, padding=3, groups=dim
         )  # depthwise conv
-        # self.dwconv = LKA(dim)
         self.norm = LayerNorm(dim, eps=1e-6)
         self.pwconv1 = nn.Linear(
             dim, 4 * dim
@@ -256,7 +253,6 @@ class ConvNeXt_bottle(nn.Module):
         if self.gamma is not None:
             x = self.gamma * x
         x = x.permute(0, 3, 1, 2)  # (N, H, W, C) -> (N, C, H, W)
-
         x = self.res_conv(input) + self.drop_path(x)
         return x
 
@@ -286,7 +282,6 @@ class LKA(nn.Module):
         attn = self.conv0(x)
         attn = self.conv_spatial(attn)
         attn = self.conv1(attn)
-
         return u * attn
 
 
@@ -310,12 +305,12 @@ class Attention(nn.Module):
         Outputs:
             (batch_size, channels * history_steps, height, width)
         """
-        shorcut = x.clone()
+        initial_input = x.clone()
         x = self.proj_1(x)
         x = self.activation(x)
         x = self.spatial_gating_unit(x)
         x = self.proj_2(x)
-        x = x + shorcut
+        x = x + initial_input
         return x
 
 
@@ -352,7 +347,6 @@ class Bottleneck(nn.Module):
         self.stride = stride
 
     def forward(self, x):
-
         residual = x
 
         out = self.conv1(x)
@@ -432,5 +426,4 @@ class Learnable_Filter(nn.Module):
         x = self.bn2(x)
         x = self.relu(x)
         x = self.residual(x)
-
         return self.seg_conv(x)
