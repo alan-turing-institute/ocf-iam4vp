@@ -50,6 +50,7 @@ class LayerNorm(nn.Module):
 
 class BasicConv2d(nn.Module):
     """Basic 2D convolutional layer from https://github.com/A4Bio/SimVP"""
+
     def __init__(
         self,
         in_channels,
@@ -114,6 +115,7 @@ class BasicConv2d(nn.Module):
 
 class ConvSC(nn.Module):
     """Basic 2D convolutional layer from https://github.com/A4Bio/SimVP"""
+
     def __init__(self, C_in, C_out, stride, transpose=False, act_norm=True):
         super(ConvSC, self).__init__()
         if stride == 1:
@@ -287,6 +289,7 @@ class LKA(nn.Module):
 
 class Attention(nn.Module):
     """Attention from https://github.com/seominseok0429/Implicit-Stacked-Autoregressive-Model-for-Video-Prediction"""
+
     def __init__(self, d_model):
         super().__init__()
 
@@ -367,63 +370,3 @@ class Bottleneck(nn.Module):
         out = self.relu(out)
 
         return out
-
-
-class Learnable_Filter(nn.Module):
-    """Refinement module of MagNet
-    Args:
-        n_classes (int): no. classes
-        use_bn (bool): use batch normalization on the input
-    """
-
-    def __init__(self, n_classes=1):
-        super().__init__()
-        self.conv1 = nn.Conv2d(640, 64, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = LayerNorm(64, eps=1e-6, data_format="channels_first")
-        self.conv2 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn2 = LayerNorm(64, eps=1e-6, data_format="channels_first")
-        self.relu = nn.SiLU(True)
-
-        # 2 residual blocks
-        self.residual = self._make_layer(Bottleneck, 64, 32, 2)
-        # self.weight_mask_conv = self._make_layer(BasicBlock, 1, 64, 1)
-
-        # Prediction head
-        self.seg_conv = nn.Conv2d(
-            128, 1, kernel_size=1, stride=1, padding=0, bias=False
-        )
-
-    def _make_layer(self, block, inplanes, planes, blocks, stride=1):
-        """Make residual block"""
-        downsample = None
-        if stride != 1 or inplanes != planes * block.expansion:
-            downsample = nn.Sequential(
-                nn.Conv2d(
-                    inplanes,
-                    planes * block.expansion,
-                    kernel_size=1,
-                    stride=stride,
-                    bias=False,
-                ),
-                LayerNorm(
-                    planes * block.expansion, eps=1e-6, data_format="channels_first"
-                ),
-            )
-
-        layers = []
-        layers.append(block(inplanes, planes, stride, downsample))
-        inplanes = planes * block.expansion
-        for i in range(1, blocks):
-            layers.append(block(inplanes, planes))
-
-        return nn.Sequential(*layers)
-
-    def forward(self, x):
-        x = self.conv1(x)  # + self.weight_mask_conv(weight_mask)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.conv2(x)
-        x = self.bn2(x)
-        x = self.relu(x)
-        x = self.residual(x)
-        return self.seg_conv(x)
