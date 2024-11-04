@@ -129,7 +129,7 @@ class Predictor(nn.Module):
         C_input = history_steps * C_latent
         self.st_block = nn.Sequential(
             ConvNeXt_bottle(dim=C_input, channels_hid=C_latent),
-            *[ConvNeXt_block(dim=C_input, channels_hid=C_latent) for _ in range(N_T)],
+            *[ConvNeXt_block(dim=C_input, channels_hid=C_latent) for _ in range(N_T - 1)],
         )
 
     def forward(self, x, time_emb):
@@ -198,7 +198,7 @@ class IAM4VP(nn.Module):
 
     Parameters:
     - C_latent: number of channels in latent space
-    - N_S: factor to reduce spatial size by when transforming to latent space
+    - N_S: number of spatial convolution layers
     - N_T: number of temporal convolution layers
     """
 

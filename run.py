@@ -29,7 +29,8 @@ def train(
     forecast_steps: int,
     history_steps: int,
     latent_space_channels: int,
-    latent_space_compression: int,
+    num_convolutions_space: int,
+    num_convolutions_time: int,
     num_epochs: int,
     output_directory: pathlib.Path,
     training_data_path: str | list[str],
@@ -61,7 +62,8 @@ def train(
     model = IAM4VP(
         (history_steps, NUM_CHANNELS, IMAGE_SIZE_TUPLE[0], IMAGE_SIZE_TUPLE[1]),
         C_latent=latent_space_channels,
-        N_S=latent_space_compression,
+        N_S=num_convolutions_space,
+        N_T=num_convolutions_time,
     )
     model = model.to(device)
 
@@ -132,7 +134,10 @@ if __name__ == "__main__":
         "--latent-space-channels", type=int, help="Number of latent space channels", default=64
     )
     parser.add_argument(
-        "--latent-space-compression", type=int, help="Compression factor to apply when transforming to latent space", default=4
+        "--num-convolutions-space", type=int, help="Number of spatial convolutions", default=4
+    )
+    parser.add_argument(
+        "--num-convolutions-time", type=int, help="Number of temporal convolutions", default=6
     )
     parser.add_argument("--num-epochs", type=int, help="Number of epochs", default=10)
     parser.add_argument(
@@ -169,7 +174,8 @@ if __name__ == "__main__":
             forecast_steps=args.num_forecast_steps,
             history_steps=args.num_history_steps,
             latent_space_channels=args.latent_space_channels,
-            latent_space_compression=args.latent_space_compression,
+            num_convolutions_space=args.num_convolutions_space,
+            num_convolutions_time=args.num_convolutions_time,
             num_epochs=args.num_epochs,
             output_directory=output_directory,
             training_data_path=training_data_path,
