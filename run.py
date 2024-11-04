@@ -30,7 +30,7 @@ def train(
     history_steps: int,
     num_epochs: int,
     output_directory: pathlib.Path,
-    training_data_path: str,
+    training_data_path: str | list[str],
     num_workers: int = 0,
 ) -> None:
     # Load the training dataset
@@ -150,6 +150,9 @@ if __name__ == "__main__":
     output_directory.mkdir(parents=True, exist_ok=True)
 
     if args.train:
+        training_data_path = [
+            str(path.resolve()) for path in pathlib.Path(args.data_path).glob("*.zarr")
+        ]
         train(
             batch_size=args.batch_size,
             device=device,
@@ -157,7 +160,7 @@ if __name__ == "__main__":
             history_steps=args.num_history_steps,
             num_epochs=args.num_epochs,
             output_directory=output_directory,
-            training_data_path=args.data_path,
+            training_data_path=training_data_path,
         )
     if args.validate:
         print("Validation is not currently supported")
