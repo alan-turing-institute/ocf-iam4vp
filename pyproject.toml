@@ -10,6 +10,8 @@ requires-python = ">=3.10"
 dependencies = [
     "cloudcasting @ git+https://github.com/alan-turing-institute/cloudcasting.git@v0.4.0",
     "einops",
+    "numpy",
     "timm",
     "torch",
+    "tqdm",
 ]
