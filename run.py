@@ -28,6 +28,7 @@ def train(
     device: str,
     forecast_steps: int,
     hidden_channels_space: int,
+    hidden_channels_time: int,
     history_steps: int,
     num_convolutions_space: int,
     num_convolutions_time: int,
@@ -62,6 +63,7 @@ def train(
     model = IAM4VP(
         (history_steps, NUM_CHANNELS, IMAGE_SIZE_TUPLE[0], IMAGE_SIZE_TUPLE[1]),
         hid_S=hidden_channels_space,
+        hid_T=hidden_channels_time,
         N_S=num_convolutions_space,
         N_T=num_convolutions_time,
     )
@@ -137,6 +139,12 @@ if __name__ == "__main__":
         default=64,
     )
     parser.add_argument(
+        "--hidden-channels-time",
+        type=int,
+        help="Number of temporal hidden channels",
+        default=512,
+    )
+    parser.add_argument(
         "--num-convolutions-space",
         type=int,
         help="Number of spatial convolutions",
@@ -182,6 +190,7 @@ if __name__ == "__main__":
             device=device,
             forecast_steps=args.num_forecast_steps,
             hidden_channels_space=args.hidden_channels_space,
+            hidden_channels_time=args.hidden_channels_time,
             history_steps=args.num_history_steps,
             num_convolutions_space=args.num_convolutions_space,
             num_convolutions_time=args.num_convolutions_time,

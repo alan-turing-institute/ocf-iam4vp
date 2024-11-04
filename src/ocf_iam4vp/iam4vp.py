@@ -126,7 +126,7 @@ class Predictor(nn.Module):
     Predict in latent space using ConvNeXt blocks
     """
 
-    def __init__(self, history_steps: int, hid_S: int, N_T: int) -> None:
+    def __init__(self, history_steps: int, hid_S: int, hid_T: int, N_T: int) -> None:
         super().__init__()
         C_input = history_steps * hid_S
         self.st_block = nn.Sequential(
@@ -208,13 +208,13 @@ class IAM4VP(nn.Module):
     """
 
     def __init__(
-        self, shape_in: torch.Size, hid_S: int = 64, N_S: int = 4, N_T: int = 6
+        self, shape_in: torch.Size, hid_S: int = 64, hid_T: int = 512, N_S: int = 4, N_T: int = 6
     ):
         super().__init__()
         T, C, H, W = shape_in
         self.time_mlp = TimeMLP(dim=hid_S)
         self.enc = Encoder(C, hid_S, N_S)
-        self.hid = Predictor(T, hid_S, N_T)
+        self.hid = Predictor(T, hid_S, hid_T, N_T)
         self.dec = Decoder(hid_S, C, N_S)
         self.mask_token = nn.Parameter(
             torch.zeros_like(self.enc(torch.randn(shape_in))[0])
