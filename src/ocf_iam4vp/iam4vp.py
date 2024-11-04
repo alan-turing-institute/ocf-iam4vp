@@ -1,11 +1,9 @@
 """Implementation of IAM4VP from https://github.com/seominseok0429/Implicit-Stacked-Autoregressive-Model-for-Video-Prediction"""
 
-import math
-
 import torch
 from torch import nn
 
-from .modules import Attention, ConvNeXt_block, ConvNeXt_bottle, ConvSC
+from .modules import Attention, ConvNeXt_block, ConvNeXt_bottle, ConvSC, TimeMLP
 
 
 def stride_generator(N, reverse=False):
@@ -14,66 +12,6 @@ def stride_generator(N, reverse=False):
         return list(reversed(strides[:N]))
     else:
         return strides[:N]
-
-
-class SinusoidalPosEmb(nn.Module):
-    def __init__(self, dim, theta=10000):
-        """
-        Sinusoidal positional embedding
-
-        from https://github.com/lucidrains/denoising-diffusion-pytorch
-        """
-        super().__init__()
-        self.dim = dim
-        self.theta = theta
-
-    def forward(self, x):
-        """
-        Transformation summary
-
-        Inputs:
-            x: (batch_size)
-
-        Outputs:
-            (batch_size, hidden_spatial)
-        """
-        device = x.device
-        half_dim = self.dim // 2
-        emb = math.log(self.theta) / (half_dim - 1)
-        emb = torch.exp(torch.arange(half_dim, device=device) * -emb)
-        emb = x[:, None] * emb[None, :]
-        emb = torch.cat((emb.sin(), emb.cos()), dim=-1)
-        return emb
-
-
-class TimeMLP(nn.Module):
-    def __init__(self, dim):
-        """
-        Time multilayer perceptron
-
-        from https://github.com/lucidrains/denoising-diffusion-pytorch
-        """
-        super(TimeMLP, self).__init__()
-        self.sinusoidaposemb = SinusoidalPosEmb(dim)
-        self.linear1 = nn.Linear(dim, dim * 4)
-        self.gelu = nn.GELU()
-        self.linear2 = nn.Linear(dim * 4, dim)
-
-    def forward(self, x):
-        """
-        Transformation summary
-
-        Inputs:
-            x: (batch_size)
-
-        Outputs:
-            (batch_size, hidden_spatial)
-        """
-        x = self.sinusoidaposemb(x)
-        x = self.linear1(x)
-        x = self.gelu(x)
-        x = self.linear2(x)
-        return x
 
 
 class Encoder(nn.Module):
