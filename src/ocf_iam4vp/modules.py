@@ -182,7 +182,7 @@ class ConvSC(nn.Module):
         return self.conv(x)
 
 
-class ConvNeXt_block(nn.Module):
+class ConvNextBlock(nn.Module):
     """
     ConvNeXt Block. There are two equivalent implementations:
     (1) DwConv -> LayerNorm (channels_first) -> 1x1 Conv -> GELU -> 1x1 Conv; all in (N, C, H, W)
@@ -250,7 +250,7 @@ class ConvNeXt_block(nn.Module):
         return x
 
 
-class ConvNeXt_bottle(nn.Module):
+class ConvNextBottle(nn.Module):
     """
     ConvNeXt Block. There are two equivalent implementations:
     (1) DwConv -> LayerNorm (channels_first) -> 1x1 Conv -> GELU -> 1x1 Conv; all in (N, C, H, W)

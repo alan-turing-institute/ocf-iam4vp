@@ -3,7 +3,7 @@
 import torch
 from torch import nn
 
-from .modules import Attention, ConvNeXt_block, ConvNeXt_bottle, ConvSC, TimeMLP
+from .modules import Attention, ConvNextBlock, ConvNextBottle, ConvSC, TimeMLP
 
 
 def stride_generator(N: int, reverse=False) -> list[int]:
@@ -130,9 +130,9 @@ class Predictor(nn.Module):
         super().__init__()
         C_input = history_steps * C_latent
         self.st_block = nn.Sequential(
-            ConvNeXt_bottle(dim=C_input, channels_hid=C_latent),
+            ConvNextBottle(dim=C_input, channels_hid=C_latent),
             *[
-                ConvNeXt_block(dim=C_input, channels_hid=C_latent)
+                ConvNextBlock(dim=C_input, channels_hid=C_latent)
                 for _ in range(N_T - 1)
             ],
         )
