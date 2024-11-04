@@ -124,12 +124,11 @@ class Predictor(nn.Module):
     Predict in latent space using ConvNeXt blocks
     """
 
-    def __init__(self, channel_in, channel_hid, N_T):
-
+    def __init__(self, channel_hid, N_T):
         super(Predictor, self).__init__()
         self.st_block = nn.Sequential(
-            ConvNeXt_bottle(dim=channel_in),
-            *[ConvNeXt_block(dim=channel_in) for _ in range(N_T)],
+            ConvNeXt_bottle(dim=channel_hid),
+            *[ConvNeXt_block(dim=channel_hid) for _ in range(N_T)],
         )
 
     def forward(self, x, time_emb):
@@ -151,6 +150,40 @@ class Predictor(nn.Module):
         return y
 
 
+class SpatioTemporalRefinement(nn.Module):
+    """
+    Spatio-temporal refinement
+
+    Refine prediction in original phase space
+    """
+
+    def __init__(self, channels, history_steps):
+        super().__init__()
+        self.channels_in = channels * history_steps
+        self.attn = Attention(self.channels_in)
+        self.readout = nn.Conv2d(self.channels_in, channels, 1)
+
+    def forward(self, x):
+        """
+        Transformation summary
+
+        Inputs:
+            x: (batch_size * history_steps, channels, height, width)
+        Outputs:
+            (batch_size, 1, height, width)
+        """
+        _, _, H, W = x.shape
+
+        # Move the history steps dimension onto channels
+        x = x.reshape(-1, self.channels_in, H, W)
+
+        # Run the attention step
+        x = self.attn(x)
+
+        # Readout to the correct shape
+        return self.readout(x)
+
+
 class IAM4VP(nn.Module):
     """
     IAM4VP model
@@ -160,7 +193,7 @@ class IAM4VP(nn.Module):
     - Combine with sinusoidal time MLP
     - Run spatio-temporal predictor
     - Spatial decoder to original phase space
-    - Spatial temporal refinement
+    - Spatial temporal refinement (STR)
     """
 
     def __init__(self, shape_in, hid_S=64, hid_T=512, N_S=4, N_T=6):
@@ -168,14 +201,13 @@ class IAM4VP(nn.Module):
         T, C, H, W = shape_in
         self.time_mlp = TimeMLP(dim=hid_S)
         self.enc = Encoder(C, hid_S, N_S)
-        self.hid = Predictor(T * hid_S, hid_T, N_T)
+        self.hid = Predictor(T * hid_S, N_T)
         self.dec = Decoder(hid_S, C, N_S)
-        self.attn = Attention(C * T)
-        self.readout = nn.Conv2d(C * T, C, 1)
         self.mask_token = nn.Parameter(
             torch.zeros(T, hid_S, -(H // -N_S), -(W // -N_S))
         )
         self.lp = LearnedPrior(C, hid_S, N_S)
+        self.str = SpatioTemporalRefinement(C, T)
 
     def forward(self, x_raw, y_raw=None, t=None):
         """
@@ -216,12 +248,5 @@ class IAM4VP(nn.Module):
         # Decode the output
         Y = self.dec(hid, skip)
 
-        # Move the history steps dimension onto channels
-        Y = Y.reshape(B, C * T, H, W)
-
-        # Run the attention step
-        Y = self.attn(Y)
-
-        # Readout to the correct shape
-        Y = self.readout(Y)
-        return Y
+        # Perform STR and return
+        return self.str(Y)
