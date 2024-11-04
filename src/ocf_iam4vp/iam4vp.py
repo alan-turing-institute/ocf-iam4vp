@@ -6,7 +6,7 @@ from torch import nn
 from .modules import Attention, ConvNeXt_block, ConvNeXt_bottle, ConvSC, TimeMLP
 
 
-def stride_generator(N, reverse=False):
+def stride_generator(N: int, reverse=False) -> list[int]:
     strides = [1, 2] * N
     if reverse:
         return list(reversed(strides[:N]))
@@ -21,7 +21,7 @@ class Encoder(nn.Module):
     Transform data from the full phase space into a reduced latent space
     """
 
-    def __init__(self, C_in, C_hid, N_S):
+    def __init__(self, C_in: int, C_hid: int, N_S: int) -> None:
         super().__init__()
         strides = stride_generator(N_S)
         self.enc = nn.Sequential(
@@ -29,7 +29,7 @@ class Encoder(nn.Module):
             *[ConvSC(C_hid, C_hid, stride=s) for s in strides[1:]],
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Transformation summary
 
@@ -54,7 +54,7 @@ class LearnedPrior(nn.Module):
     Transform priors from the full phase space into a reduced latent space
     """
 
-    def __init__(self, C_in, C_hid, N_S):
+    def __init__(self, C_in: int, C_hid: int, N_S: int) -> None:
         super().__init__()
         strides = stride_generator(N_S)
         self.enc = nn.Sequential(
@@ -62,7 +62,7 @@ class LearnedPrior(nn.Module):
             *[ConvSC(C_hid, C_hid, stride=s) for s in strides[1:]],
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Transformation summary
 
@@ -87,7 +87,7 @@ class Decoder(nn.Module):
     Transform data from the reduced latent space into the full phase space
     """
 
-    def __init__(self, C_hid, C_out, N_S):
+    def __init__(self, C_hid: int, C_out: int, N_S: int) -> None:
         super().__init__()
         strides = stride_generator(N_S, reverse=True)
         self.dec = nn.Sequential(
@@ -96,7 +96,9 @@ class Decoder(nn.Module):
         )
         self.readout = nn.Conv2d(C_hid, C_out, 1)
 
-    def forward(self, hid, enc1=None):
+    def forward(
+        self, hid: torch.Tensor, enc1: torch.Tensor | None = None
+    ) -> torch.Tensor:
         """
         Transformation summary
 
@@ -124,15 +126,18 @@ class Predictor(nn.Module):
     Predict in latent space using ConvNeXt blocks
     """
 
-    def __init__(self, history_steps, C_latent, N_T):
+    def __init__(self, history_steps: int, C_latent: int, N_T: int) -> None:
         super().__init__()
         C_input = history_steps * C_latent
         self.st_block = nn.Sequential(
             ConvNeXt_bottle(dim=C_input, channels_hid=C_latent),
-            *[ConvNeXt_block(dim=C_input, channels_hid=C_latent) for _ in range(N_T - 1)],
+            *[
+                ConvNeXt_block(dim=C_input, channels_hid=C_latent)
+                for _ in range(N_T - 1)
+            ],
         )
 
-    def forward(self, x, time_emb):
+    def forward(self, x: torch.Tensor, time_emb: torch.Tensor) -> torch.Tensor:
         """
         Transformation summary
 
@@ -158,13 +163,13 @@ class SpatioTemporalRefinement(nn.Module):
     Refine prediction in original phase space
     """
 
-    def __init__(self, channels, history_steps):
+    def __init__(self, channels: int, history_steps: int) -> None:
         super().__init__()
         self.channels_in = channels * history_steps
         self.attn = Attention(self.channels_in)
         self.readout = nn.Conv2d(self.channels_in, channels, 1)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Transformation summary
 
@@ -202,25 +207,34 @@ class IAM4VP(nn.Module):
     - N_T: number of temporal convolution layers
     """
 
-    def __init__(self, shape_in, C_latent=64, N_S=4, N_T=6):
+    def __init__(
+        self, shape_in: torch.Size, C_latent: int = 64, N_S: int = 4, N_T: int = 6
+    ):
         super().__init__()
         T, C, H, W = shape_in
         self.time_mlp = TimeMLP(dim=C_latent)
         self.enc = Encoder(C, C_latent, N_S)
         self.hid = Predictor(T, C_latent, N_T)
         self.dec = Decoder(C_latent, C, N_S)
-        shape_latent = self.enc(torch.randn(shape_in))[0].shape # get latent shape
-        self.mask_token = nn.Parameter(torch.zeros(shape_latent))
+        self.mask_token = nn.Parameter(
+            torch.zeros_like(self.enc(torch.randn(shape_in))[0])
+        )
         self.lp = LearnedPrior(C, C_latent, N_S)
         self.str = SpatioTemporalRefinement(C, T)
 
-    def forward(self, x_raw, y_raw=None, t=None):
+    def forward(
+        self,
+        x_raw: torch.Tensor,
+        y_raw: list[torch.Tensor] = [],
+        t: torch.Tensor | None = None,
+    ) -> torch.Tensor:
         """
         Transformation summary
 
         Inputs:
             x: (batch_size, history_steps, channels, height, width)
             y_raw: N * (batch_size, channels, height, width)
+            t: (batch_size)
 
         Outputs:
             (batch_size, channels, height, width)

@@ -131,13 +131,22 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size", type=int, help="Batch size", default=2)
     parser.add_argument("--data-path", type=str, help="Path to the input data")
     parser.add_argument(
-        "--latent-space-channels", type=int, help="Number of latent space channels", default=64
+        "--latent-space-channels",
+        type=int,
+        help="Number of latent space channels",
+        default=64,
     )
     parser.add_argument(
-        "--num-convolutions-space", type=int, help="Number of spatial convolutions", default=4
+        "--num-convolutions-space",
+        type=int,
+        help="Number of spatial convolutions",
+        default=4,
     )
     parser.add_argument(
-        "--num-convolutions-time", type=int, help="Number of temporal convolutions", default=6
+        "--num-convolutions-time",
+        type=int,
+        help="Number of temporal convolutions",
+        default=6,
     )
     parser.add_argument("--num-epochs", type=int, help="Number of epochs", default=10)
     parser.add_argument(

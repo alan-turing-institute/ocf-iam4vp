@@ -16,12 +16,12 @@ class SinusoidalPosEmb(nn.Module):
     from https://github.com/lucidrains/denoising-diffusion-pytorch
     """
 
-    def __init__(self, dim, theta=10000):
+    def __init__(self, dim: int, theta: float = 10000) -> None:
         super().__init__()
         self.half_dim = dim // 2
         self.scale = math.log(theta) / (self.half_dim - 1)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Transformation summary
 
@@ -45,14 +45,14 @@ class TimeMLP(nn.Module):
     from https://github.com/lucidrains/denoising-diffusion-pytorch
     """
 
-    def __init__(self, dim):
+    def __init__(self, dim: int) -> None:
         super().__init__()
         self.sinusoidaposemb = SinusoidalPosEmb(dim)
         self.linear1 = nn.Linear(dim, dim * 4)
         self.gelu = nn.GELU()
         self.linear2 = nn.Linear(dim * 4, dim)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Transformation summary
 
@@ -82,7 +82,12 @@ class LayerNorm(nn.Module):
     from https://github.com/facebookresearch/ConvNeXt
     """
 
-    def __init__(self, normalized_shape, eps=1e-6, data_format="channels_last"):
+    def __init__(
+        self,
+        normalized_shape: int,
+        eps: float = 1e-6,
+        data_format: str = "channels_last",
+    ) -> None:
         super().__init__()
         self.weight = nn.Parameter(torch.ones(normalized_shape))
         self.bias = nn.Parameter(torch.zeros(normalized_shape))
@@ -92,7 +97,7 @@ class LayerNorm(nn.Module):
             raise NotImplementedError
         self.normalized_shape = (normalized_shape,)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Transformation summary
 
@@ -124,15 +129,15 @@ class BasicConv2d(nn.Module):
 
     def __init__(
         self,
-        in_channels,
-        out_channels,
-        kernel_size,
-        stride,
-        padding,
-        dilation=1,
-        transpose=False,
-        act_norm=False,
-    ):
+        in_channels: int,
+        out_channels: int,
+        kernel_size: int,
+        stride: int,
+        padding: int,
+        dilation: int = 1,
+        transpose: bool = False,
+        act_norm: bool = False,
+    ) -> None:
         super().__init__()
         self.act_norm = act_norm
         if transpose is True:
@@ -163,12 +168,12 @@ class BasicConv2d(nn.Module):
 
         self.apply(self._init_weights)
 
-    def _init_weights(self, m):
+    def _init_weights(self, m: nn.Module) -> None:
         if isinstance(m, (nn.Conv2d)):
             trunc_normal_(m.weight, std=0.02)
             nn.init.constant_(m.bias, 0)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Transformation summary
 
@@ -191,7 +196,14 @@ class ConvSC(nn.Module):
     from https://github.com/A4Bio/SimVP
     """
 
-    def __init__(self, C_in, C_out, stride, transpose=False, act_norm=True):
+    def __init__(
+        self,
+        C_in: int,
+        C_out: int,
+        stride: int,
+        transpose: bool = False,
+        act_norm: bool = True,
+    ):
         super().__init__()
         if stride == 1:
             transpose = False
@@ -205,7 +217,7 @@ class ConvSC(nn.Module):
             act_norm=act_norm,
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Transformation summary
 
@@ -234,7 +246,13 @@ class ConvNeXt_block(nn.Module):
     from https://github.com/facebookresearch/ConvNeXt
     """
 
-    def __init__(self, dim, channels_hid=64, drop_path=0.0, layer_scale_init_value=1e-6):
+    def __init__(
+        self,
+        dim: int,
+        channels_hid: int = 64,
+        drop_path: float = 0.0,
+        layer_scale_init_value: float = 1e-6,
+    ) -> None:
         super().__init__()
         self.mlp = nn.Sequential(nn.GELU(), nn.Linear(channels_hid, dim))
         self.dwconv = LKA(dim)
@@ -251,7 +269,9 @@ class ConvNeXt_block(nn.Module):
         )
         self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
 
-    def forward(self, x, time_emb=None):
+    def forward(
+        self, x: torch.Tensor, time_emb: torch.Tensor | None = None
+    ) -> torch.Tensor:
         """
         Transformation summary
 
@@ -294,7 +314,13 @@ class ConvNeXt_bottle(nn.Module):
     from https://github.com/facebookresearch/ConvNeXt
     """
 
-    def __init__(self, dim, channels_hid=64, drop_path=0.0, layer_scale_init_value=1e-6):
+    def __init__(
+        self,
+        dim: int,
+        channels_hid: int = 64,
+        drop_path: float = 0.0,
+        layer_scale_init_value: float = 1e-6,
+    ) -> None:
         super().__init__()
         self.mlp = nn.Sequential(nn.GELU(), nn.Linear(channels_hid, dim))
         self.dwconv = nn.Conv2d(
@@ -314,7 +340,9 @@ class ConvNeXt_bottle(nn.Module):
         self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
         self.res_conv = nn.Conv2d(dim * 2, dim, 1)
 
-    def forward(self, x, time_emb=None):
+    def forward(
+        self, x: torch.Tensor, time_emb: torch.Tensor | None = None
+    ) -> torch.Tensor:
         """
         Transformation summary
 
@@ -343,7 +371,7 @@ class ConvNeXt_bottle(nn.Module):
 class LKA(nn.Module):
     """Large Kernel Attention from https://github.com/seominseok0429/Implicit-Stacked-Autoregressive-Model-for-Video-Prediction"""
 
-    def __init__(self, dim):
+    def __init__(self, dim: int) -> None:
         super().__init__()
         self.conv0 = nn.Conv2d(dim, dim, 5, padding=2, groups=dim)
         self.conv_spatial = nn.Conv2d(
@@ -351,7 +379,7 @@ class LKA(nn.Module):
         )
         self.conv1 = nn.Conv2d(dim, dim, 1)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Transformation summary
 
@@ -371,7 +399,7 @@ class LKA(nn.Module):
 class Attention(nn.Module):
     """Attention from https://github.com/seominseok0429/Implicit-Stacked-Autoregressive-Model-for-Video-Prediction"""
 
-    def __init__(self, d_model):
+    def __init__(self, d_model: int) -> None:
         super().__init__()
 
         self.proj_1 = nn.Conv2d(d_model, d_model, 1)
@@ -379,7 +407,7 @@ class Attention(nn.Module):
         self.spatial_gating_unit = LKA(d_model)
         self.proj_2 = nn.Conv2d(d_model, d_model, 1)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Transformation summary
 
