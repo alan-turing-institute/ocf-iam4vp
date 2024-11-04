@@ -62,7 +62,7 @@ class LearnedPrior(nn.Module):
             *[ConvSC(C_hid, C_hid, stride=s) for s in strides[1:]],
         )
 
-    def forward(self, x):  # B*4, 3, 128, 128
+    def forward(self, x):
         """
         Transformation summary
 
@@ -124,11 +124,12 @@ class Predictor(nn.Module):
     Predict in latent space using ConvNeXt blocks
     """
 
-    def __init__(self, channel_hid, N_T):
+    def __init__(self, history_steps, C_latent, N_T):
         super().__init__()
+        C_input = history_steps * C_latent
         self.st_block = nn.Sequential(
-            ConvNeXt_bottle(dim=channel_hid),
-            *[ConvNeXt_block(dim=channel_hid) for _ in range(N_T)],
+            ConvNeXt_bottle(dim=C_input, channels_hid=C_latent),
+            *[ConvNeXt_block(dim=C_input, channels_hid=C_latent) for _ in range(N_T)],
         )
 
     def forward(self, x, time_emb):
@@ -194,19 +195,24 @@ class IAM4VP(nn.Module):
     - Run spatio-temporal predictor
     - Spatial decoder to original phase space
     - Spatial temporal refinement (STR)
+
+    Parameters:
+    - C_latent: number of channels in latent space
+    - N_S: factor to reduce spatial size by when transforming to latent space
+    - N_T: number of temporal convolution layers
     """
 
-    def __init__(self, shape_in, hid_S=64, hid_T=512, N_S=4, N_T=6):
+    def __init__(self, shape_in, C_latent=64, N_S=4, N_T=6):
         super().__init__()
         T, C, H, W = shape_in
-        self.time_mlp = TimeMLP(dim=hid_S)
-        self.enc = Encoder(C, hid_S, N_S)
-        self.hid = Predictor(T * hid_S, N_T)
-        self.dec = Decoder(hid_S, C, N_S)
+        self.time_mlp = TimeMLP(dim=C_latent)
+        self.enc = Encoder(C, C_latent, N_S)
+        self.hid = Predictor(T, C_latent, N_T)
+        self.dec = Decoder(C_latent, C, N_S)
         self.mask_token = nn.Parameter(
-            torch.zeros(T, hid_S, -(H // -N_S), -(W // -N_S))
+            torch.zeros(T, C_latent, -(H // -N_S), -(W // -N_S))
         )
-        self.lp = LearnedPrior(C, hid_S, N_S)
+        self.lp = LearnedPrior(C, C_latent, N_S)
         self.str = SpatioTemporalRefinement(C, T)
 
     def forward(self, x_raw, y_raw=None, t=None):

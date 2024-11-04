@@ -79,7 +79,7 @@ class LayerNorm(nn.Module):
     channels_first:
         (batch_size, channels, height, width).
 
-    from https://github.com/seominseok0429/Implicit-Stacked-Autoregressive-Model-for-Video-Prediction
+    from https://github.com/facebookresearch/ConvNeXt
     """
 
     def __init__(self, normalized_shape, eps=1e-6, data_format="channels_last"):
@@ -227,13 +227,16 @@ class ConvNeXt_block(nn.Module):
 
     Args:
         dim (int): Number of input channels.
+        channels_hid (int): Number of hidden channels
         drop_path (float): Stochastic depth rate. Default: 0.0
         layer_scale_init_value (float): Init value for Layer Scale. Default: 1e-6.
+
+    from https://github.com/facebookresearch/ConvNeXt
     """
 
-    def __init__(self, dim, drop_path=0.0, layer_scale_init_value=1e-6):
+    def __init__(self, dim, channels_hid=64, drop_path=0.0, layer_scale_init_value=1e-6):
         super().__init__()
-        self.mlp = nn.Sequential(nn.GELU(), nn.Linear(64, dim))
+        self.mlp = nn.Sequential(nn.GELU(), nn.Linear(channels_hid, dim))
         self.dwconv = LKA(dim)
         self.norm = LayerNorm(dim, eps=1e-6)
         self.pwconv1 = nn.Linear(
@@ -284,13 +287,16 @@ class ConvNeXt_bottle(nn.Module):
 
     Args:
         dim (int): Number of input channels.
+        channels_hid (int): Number of hidden channels
         drop_path (float): Stochastic depth rate. Default: 0.0
         layer_scale_init_value (float): Init value for Layer Scale. Default: 1e-6.
+
+    from https://github.com/facebookresearch/ConvNeXt
     """
 
-    def __init__(self, dim, drop_path=0.0, layer_scale_init_value=1e-6):
+    def __init__(self, dim, channels_hid=64, drop_path=0.0, layer_scale_init_value=1e-6):
         super().__init__()
-        self.mlp = nn.Sequential(nn.GELU(), nn.Linear(64, dim))
+        self.mlp = nn.Sequential(nn.GELU(), nn.Linear(channels_hid, dim))
         self.dwconv = nn.Conv2d(
             dim * 2, dim, kernel_size=7, padding=3, groups=dim
         )  # depthwise conv
