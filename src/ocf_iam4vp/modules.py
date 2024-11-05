@@ -207,7 +207,7 @@ class ConvNextBlock(nn.Module):
     ) -> None:
         super().__init__()
         self.mlp = nn.Sequential(nn.GELU(), nn.Linear(hidden_spatial, dim))
-        self.dwconv = LKA(dim)
+        self.dwconv = LargeKernelAttention(dim)
         self.convnext = ConvNextLayer(
             ConvNextConfig(
                 hidden_act="gelu", layer_scale_init_value=layer_scale_init_value
@@ -302,7 +302,7 @@ class ConvNextBottle(nn.Module):
         return x
 
 
-class LKA(nn.Module):
+class LargeKernelAttention(nn.Module):
     """Large Kernel Attention from https://github.com/seominseok0429/Implicit-Stacked-Autoregressive-Model-for-Video-Prediction"""
 
     def __init__(self, dim: int) -> None:
@@ -338,7 +338,7 @@ class Attention(nn.Module):
 
         self.proj_1 = nn.Conv2d(d_model, d_model, 1)
         self.activation = nn.GELU()
-        self.spatial_gating_unit = LKA(d_model)
+        self.spatial_gating_unit = LargeKernelAttention(d_model)
         self.proj_2 = nn.Conv2d(d_model, d_model, 1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
