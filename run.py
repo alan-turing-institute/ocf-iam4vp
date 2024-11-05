@@ -11,7 +11,9 @@ from cloudcasting.constants import (
     IMAGE_SIZE_TUPLE,
     NUM_CHANNELS,
 )
-from cloudcasting.dataset import SatelliteDataset
+from cloudcasting.dataset import SatelliteDataset, ValidationSatelliteDataset
+from cloudcasting.utils import numpy_validation_collate_fn
+from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 from torchinfo import summary
 
@@ -67,12 +69,12 @@ def summarise(
 def train(
     batch_size: int,
     device: str,
-    forecast_steps: int,
     hidden_channels_space: int,
     hidden_channels_time: int,
     num_convolutions_space: int,
     num_convolutions_time: int,
     num_epochs: int,
+    num_forecast_steps: int,
     num_history_steps: int,
     output_directory: pathlib.Path,
     training_data_path: str | list[str],
@@ -84,7 +86,7 @@ def train(
         start_time="2022-01-31",
         end_time=None,
         history_mins=(num_history_steps - 1) * DATA_INTERVAL_SPACING_MINUTES,
-        forecast_mins=forecast_steps * DATA_INTERVAL_SPACING_MINUTES,
+        forecast_mins=num_forecast_steps * DATA_INTERVAL_SPACING_MINUTES,
         sample_freq_mins=DATA_INTERVAL_SPACING_MINUTES,
         nan_to_num=True,
     )
@@ -128,7 +130,7 @@ def train(
             batch_y = batch_y.swapaxes(1, 2).to(device)
 
             y_hats = []
-            for f_step in range(forecast_steps):
+            for f_step in range(num_forecast_steps):
                 # Zero the parameter gradients
                 optimizer.zero_grad()
 
@@ -136,7 +138,7 @@ def train(
                 times = torch.tensor(f_step * 100).repeat(batch_X.shape[0]).to(device)
 
                 # Forward pass for the next time step
-                y_hat = model(batch_X, y_hats, times)
+                y_hat = model(batch_X, times, y_hats)
 
                 # Calculate the loss
                 loss = criterion(y_hat, batch_y[:, f_step, :, :, :])
@@ -165,6 +167,65 @@ def train(
             )
             save_model = False
 
+def validate(
+    batch_size: int,
+    device: str,
+    hidden_channels_space: int,
+    hidden_channels_time: int,
+    num_convolutions_space: int,
+    num_convolutions_time: int,
+    num_history_steps: int,
+    output_directory: pathlib.Path,
+    state_dict_path: str,
+    validation_data_path: str | list[str],
+    num_workers: int = 0,
+) -> None:
+    # Create the model
+    model = IAM4VP(
+        (num_history_steps, NUM_CHANNELS, IMAGE_SIZE_TUPLE[0], IMAGE_SIZE_TUPLE[1]),
+        hid_S=hidden_channels_space,
+        hid_T=hidden_channels_time,
+        N_S=num_convolutions_space,
+        N_T=num_convolutions_time,
+    )
+    model.load_state_dict(torch.load(state_dict_path, map_location=device, weights_only=True))
+    model = model.to(device)
+    model.eval()
+
+    # Set up the validation dataset
+    num_forecast_steps = 1
+    valid_dataset = ValidationSatelliteDataset(
+        zarr_path=validation_data_path,
+        history_mins=(num_history_steps - 1) * DATA_INTERVAL_SPACING_MINUTES,
+        forecast_mins=num_forecast_steps * DATA_INTERVAL_SPACING_MINUTES,
+        sample_freq_mins=DATA_INTERVAL_SPACING_MINUTES,
+        nan_to_num=True,
+    )
+
+    valid_dataloader = DataLoader(
+        dataset=valid_dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        shuffle=False,
+        collate_fn=numpy_validation_collate_fn,
+        drop_last=False,
+    )
+
+    def plot(y: torch.Tensor, y_hat: torch.Tensor, name: str) -> None:
+        y = y.detach().cpu()
+        y_hat = y_hat.detach().cpu()
+        fig, (ax1, ax2) = plt.subplots(1, 2)
+        ax1.imshow(y, cmap="gray")
+        ax2.imshow(y_hat, cmap="gray")
+        fig.savefig(f"{output_directory}/{name}.png")
+
+    times = torch.tensor(100).repeat(batch_size).to(device)
+    for idx, (X, y) in enumerate(tqdm.tqdm(valid_dataloader)):
+        if idx % 100 == 0:
+            X = torch.from_numpy(X).swapaxes(1, 2).to(device)
+            y = torch.from_numpy(y).swapaxes(1, 2).to(device)
+            y_hat = model(X, times)
+            plot(y[0][0][0], y_hat[0][0], name=f"cloud-{idx}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -233,12 +294,12 @@ if __name__ == "__main__":
         train(
             batch_size=args.batch_size,
             device=device,
-            forecast_steps=args.num_forecast_steps,
             hidden_channels_space=args.hidden_channels_space,
             hidden_channels_time=args.hidden_channels_time,
             num_convolutions_space=args.num_convolutions_space,
             num_convolutions_time=args.num_convolutions_time,
             num_epochs=args.num_epochs,
+            num_forecast_steps=args.num_forecast_steps,
             num_history_steps=args.num_history_steps,
             output_directory=output_directory,
             training_data_path=training_data_path,
@@ -254,4 +315,18 @@ if __name__ == "__main__":
             num_history_steps=args.num_history_steps,
         )
     if args.validate:
-        print("Validation is not currently supported")
+        validation_data_path = [
+            str(path.resolve()) for path in pathlib.Path(args.data_path).glob("*.zarr")
+        ]
+        validate(
+            batch_size=args.batch_size,
+            device=device,
+            hidden_channels_space=args.hidden_channels_space,
+            hidden_channels_time=args.hidden_channels_time,
+            num_convolutions_space=args.num_convolutions_space,
+            num_convolutions_time=args.num_convolutions_time,
+            num_history_steps=args.num_history_steps,
+            output_directory=output_directory,
+            state_dict_path=args.model_state_dict,
+            validation_data_path=validation_data_path,
+        )

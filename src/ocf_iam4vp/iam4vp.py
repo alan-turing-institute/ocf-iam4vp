@@ -233,8 +233,8 @@ class IAM4VP(nn.Module):
     def forward(
         self,
         x_raw: torch.Tensor,
+        t_raw: torch.Tensor,
         y_raw: list[torch.Tensor] = [],
-        t: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """
         Transformation summary
@@ -247,7 +247,6 @@ class IAM4VP(nn.Module):
         Outputs:
             (batch_size, channels, height, width)
         """
-
         # Combine batch and time information
         B, T, C, H, W = x_raw.shape
         x = x_raw.contiguous().view(B * T, C, H, W)
@@ -268,7 +267,7 @@ class IAM4VP(nn.Module):
         combined_latent = torch.cat([x_latent, priors_latent], dim=1)
 
         # Run predictor on combined latent data + time embedding
-        time_emb = self.time_mlp(t)
+        time_emb = self.time_mlp(t_raw)
         hid = self.hid(combined_latent, time_emb)
         hid = hid.reshape(B * T, C_, H_, W_)
 
