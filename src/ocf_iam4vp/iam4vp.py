@@ -3,7 +3,7 @@
 import torch
 from torch import nn
 
-from .modules import Attention, ConvNextBlock, ConvNextBottle, ConvSC, TimeMLP
+from .modules import Attention, ConvNextTimeEmbedLKA, ConvNextTimeEmbed, ConvSC, TimeMLP
 
 
 def stride_generator(N: int, reverse=False) -> list[int]:
@@ -130,8 +130,11 @@ class Predictor(nn.Module):
         super().__init__()
         self.spatial_to_temporal = nn.Conv2d(2 * history_steps * hid_S, hid_T, 1)
         self.cn_blocks = nn.Sequential(
-            ConvNextBottle(dim=hid_T, hidden_spatial=hid_S),
-            *[ConvNextBlock(dim=hid_T, hidden_spatial=hid_S) for _ in range(N_T - 1)],
+            ConvNextTimeEmbed(dim=hid_T, hidden_spatial=hid_S),
+            *[
+                ConvNextTimeEmbedLKA(dim=hid_T, hidden_spatial=hid_S)
+                for _ in range(N_T - 1)
+            ],
         )
         self.temporal_to_spatial = nn.Conv2d(hid_T, history_steps * hid_S, 1)
 

@@ -185,17 +185,11 @@ class ConvSC(nn.Module):
         return self.conv(x)
 
 
-class ConvNextBlock(nn.Module):
+class ConvNextTimeEmbedLKA(nn.Module):
     """
-    ConvNeXt block, adapted to use LKA.
+    ConvNeXt block, with LKA instead of depth-wise convolution and adapted to add time embeddings.
 
-    Args:
-        dim (int): Number of input channels.
-        hidden_spatial (int): Number of hidden spatial channels
-        drop_path (float): Stochastic depth rate. Default: 0.0
-        layer_scale_init_value (float): Init value for Layer Scale. Default: 1e-6.
-
-    from https://github.com/facebookresearch/ConvNeXt
+    from https://github.com/seominseok0429/Implicit-Stacked-Autoregressive-Model-for-Video-Prediction
     """
 
     def __init__(
@@ -244,17 +238,11 @@ class ConvNextBlock(nn.Module):
         return x
 
 
-class ConvNextBottle(nn.Module):
+class ConvNextTimeEmbed(nn.Module):
     """
-    ConvNeXt block, adapted for input size != dimension
+    ConvNeXt block, adapted to add time embeddings.
 
-    Args:
-        dim (int): Number of input channels.
-        hidden_spatial (int): Number of hidden spatial channels
-        drop_path (float): Stochastic depth rate. Default: 0.0
-        layer_scale_init_value (float): Init value for Layer Scale. Default: 1e-6.
-
-    from https://github.com/facebookresearch/ConvNeXt
+    from https://github.com/seominseok0429/Implicit-Stacked-Autoregressive-Model-for-Video-Prediction
     """
 
     def __init__(
