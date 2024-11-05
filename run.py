@@ -218,6 +218,7 @@ def validate(
         ax1.imshow(y, cmap="gray")
         ax2.imshow(y_hat, cmap="gray")
         fig.savefig(f"{output_directory}/{name}.png")
+        plt.close()
 
     times = torch.tensor(100).repeat(batch_size).to(device)
     for idx, (X, y) in enumerate(tqdm.tqdm(valid_dataloader)):
