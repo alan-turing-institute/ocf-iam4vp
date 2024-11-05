@@ -65,7 +65,7 @@ def summarise(
     print(f"- num-convolutions-time: {num_convolutions_time}")
     print(f"- num-forecast-steps: {num_forecast_steps}")
     print(f"- num-history-steps: {num_history_steps}")
-    summary(model, input_data=(batch_X, [], times), device=device)
+    summary(model, input_data=(batch_X, times, []), device=device)
 
 
 def train(
