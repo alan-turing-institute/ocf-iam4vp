@@ -33,6 +33,7 @@ def summarise(
     hidden_channels_time: int,
     num_convolutions_space: int,
     num_convolutions_time: int,
+    num_forecast_steps: int,
     num_history_steps: int,
 ) -> None:
     # Create the model
@@ -62,6 +63,7 @@ def summarise(
     print(f"- hidden-channels-time: {hidden_channels_time}")
     print(f"- num-convolutions-space: {num_convolutions_space}")
     print(f"- num-convolutions-time: {num_convolutions_time}")
+    print(f"- num-forecast-steps: {num_forecast_steps}")
     print(f"- num-history-steps: {num_history_steps}")
     summary(model, input_data=(batch_X, [], times), device=device)
 
@@ -313,6 +315,7 @@ if __name__ == "__main__":
             hidden_channels_time=args.hidden_channels_time,
             num_convolutions_space=args.num_convolutions_space,
             num_convolutions_time=args.num_convolutions_time,
+            num_forecast_steps=args.num_forecast_steps,
             num_history_steps=args.num_history_steps,
         )
     if args.validate:

@@ -12,6 +12,7 @@ Settings:
 - hidden-channels-time: 256
 - num-convolutions-space: 4
 - num-convolutions-time: 6
+- num-forecast-steps: 6
 - num-history-steps: 24
 =========================================================================================================
 Layer (type:depth-idx)                                  Output Shape              Param #
