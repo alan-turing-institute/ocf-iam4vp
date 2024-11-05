@@ -3,11 +3,14 @@
 import math
 
 import torch
-import torch.nn.functional as F
 from einops import rearrange
-from timm.layers import DropPath, trunc_normal_
+from timm.layers import trunc_normal_
 from torch import nn
-from transformers.models.convnext.modeling_convnext import ConvNextLayerNorm
+from transformers.models.convnext.modeling_convnext import (
+    ConvNextConfig,
+    ConvNextLayer,
+    ConvNextLayerNorm,
+)
 
 
 class SinusoidalPosEmb(nn.Module):
@@ -184,14 +187,11 @@ class ConvSC(nn.Module):
 
 class ConvNextBlock(nn.Module):
     """
-    ConvNeXt Block. There are two equivalent implementations:
-    (1) DwConv -> LayerNorm (channels_first) -> 1x1 Conv -> GELU -> 1x1 Conv; all in (N, C, H, W)
-    (2) DwConv -> Permute to (N, H, W, C); LayerNorm (channels_last) -> Linear -> GELU -> Linear; Permute back
-    We use (2) as we find it slightly faster in PyTorch
+    ConvNeXt block, adapted to use LKA.
 
     Args:
         dim (int): Number of input channels.
-        channels_hid (int): Number of hidden channels
+        hidden_spatial (int): Number of hidden spatial channels
         drop_path (float): Stochastic depth rate. Default: 0.0
         layer_scale_init_value (float): Init value for Layer Scale. Default: 1e-6.
 
@@ -201,25 +201,20 @@ class ConvNextBlock(nn.Module):
     def __init__(
         self,
         dim: int,
-        channels_hid: int = 64,
+        hidden_spatial: int = 64,
         drop_path: float = 0.0,
         layer_scale_init_value: float = 1e-6,
     ) -> None:
         super().__init__()
-        self.mlp = nn.Sequential(nn.GELU(), nn.Linear(channels_hid, dim))
+        self.mlp = nn.Sequential(nn.GELU(), nn.Linear(hidden_spatial, dim))
         self.dwconv = LKA(dim)
-        self.norm = ConvNextLayerNorm(dim, eps=1e-6)
-        self.pwconv1 = nn.Linear(
-            dim, 4 * dim
-        )  # pointwise/1x1 convs, implemented with linear layers
-        self.act = nn.GELU()
-        self.pwconv2 = nn.Linear(4 * dim, dim)
-        self.gamma = (
-            nn.Parameter(layer_scale_init_value * torch.ones((dim)), requires_grad=True)
-            if layer_scale_init_value > 0
-            else None
+        self.convnext = ConvNextLayer(
+            ConvNextConfig(
+                hidden_act="gelu", layer_scale_init_value=layer_scale_init_value
+            ),
+            dim=dim,
+            drop_path=drop_path,
         )
-        self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
 
     def forward(
         self, x: torch.Tensor, time_emb: torch.Tensor | None = None
@@ -238,28 +233,24 @@ class ConvNextBlock(nn.Module):
         time_emb = self.mlp(time_emb)
         x = self.dwconv(x) + rearrange(time_emb, "b c -> b c 1 1")
         x = x.permute(0, 2, 3, 1)  # (N, C, H, W) -> (N, H, W, C)
-        x = self.norm(x)
-        x = self.pwconv1(x)
-        x = self.act(x)
-        x = self.pwconv2(x)
-        if self.gamma is not None:
-            x = self.gamma * x
+        x = self.convnext.layernorm(x)
+        x = self.convnext.pwconv1(x)
+        x = self.convnext.act(x)
+        x = self.convnext.pwconv2(x)
+        if self.convnext.layer_scale_parameter is not None:
+            x = self.convnext.layer_scale_parameter * x
         x = x.permute(0, 3, 1, 2)  # (N, H, W, C) -> (N, C, H, W)
-
-        x = input + self.drop_path(x)
+        x = input + self.convnext.drop_path(x)
         return x
 
 
 class ConvNextBottle(nn.Module):
     """
-    ConvNeXt Block. There are two equivalent implementations:
-    (1) DwConv -> LayerNorm (channels_first) -> 1x1 Conv -> GELU -> 1x1 Conv; all in (N, C, H, W)
-    (2) DwConv -> Permute to (N, H, W, C); LayerNorm (channels_last) -> Linear -> GELU -> Linear; Permute back
-    We use (2) as we find it slightly faster in PyTorch
+    ConvNeXt block, adapted for input size != dimension
 
     Args:
         dim (int): Number of input channels.
-        channels_hid (int): Number of hidden channels
+        hidden_spatial (int): Number of hidden spatial channels
         drop_path (float): Stochastic depth rate. Default: 0.0
         layer_scale_init_value (float): Init value for Layer Scale. Default: 1e-6.
 
@@ -269,28 +260,19 @@ class ConvNextBottle(nn.Module):
     def __init__(
         self,
         dim: int,
-        channels_hid: int = 64,
+        hidden_spatial: int,
         drop_path: float = 0.0,
         layer_scale_init_value: float = 1e-6,
     ) -> None:
         super().__init__()
-        self.mlp = nn.Sequential(nn.GELU(), nn.Linear(channels_hid, dim))
-        self.dwconv = nn.Conv2d(
-            dim * 2, dim, kernel_size=7, padding=3, groups=dim
-        )  # depthwise conv
-        self.norm = ConvNextLayerNorm(dim, eps=1e-6)
-        self.pwconv1 = nn.Linear(
-            dim, 4 * dim
-        )  # pointwise/1x1 convs, implemented with linear layers
-        self.act = nn.GELU()
-        self.pwconv2 = nn.Linear(4 * dim, dim)
-        self.gamma = (
-            nn.Parameter(layer_scale_init_value * torch.ones((dim)), requires_grad=True)
-            if layer_scale_init_value > 0
-            else None
+        self.mlp = nn.Sequential(nn.GELU(), nn.Linear(hidden_spatial, dim))
+        self.convnext = ConvNextLayer(
+            ConvNextConfig(
+                hidden_act="gelu", layer_scale_init_value=layer_scale_init_value
+            ),
+            dim=dim,
+            drop_path=drop_path,
         )
-        self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
-        self.res_conv = nn.Conv2d(dim * 2, dim, 1)
 
     def forward(
         self, x: torch.Tensor, time_emb: torch.Tensor | None = None
@@ -307,16 +289,16 @@ class ConvNextBottle(nn.Module):
         """
         input = x
         time_emb = self.mlp(time_emb)
-        x = self.dwconv(x) + rearrange(time_emb, "b c -> b c 1 1")
+        x = self.convnext.dwconv(x) + rearrange(time_emb, "b c -> b c 1 1")
         x = x.permute(0, 2, 3, 1)  # (N, C, H, W) -> (N, H, W, C)
-        x = self.norm(x)
-        x = self.pwconv1(x)
-        x = self.act(x)
-        x = self.pwconv2(x)
-        if self.gamma is not None:
-            x = self.gamma * x
+        x = self.convnext.layernorm(x)
+        x = self.convnext.pwconv1(x)
+        x = self.convnext.act(x)
+        x = self.convnext.pwconv2(x)
+        if self.convnext.layer_scale_parameter is not None:
+            x = self.convnext.layer_scale_parameter * x
         x = x.permute(0, 3, 1, 2)  # (N, H, W, C) -> (N, C, H, W)
-        x = self.res_conv(input) + self.drop_path(x)
+        x = input + self.convnext.drop_path(x)
         return x
 
 

@@ -128,14 +128,12 @@ class Predictor(nn.Module):
 
     def __init__(self, history_steps: int, hid_S: int, hid_T: int, N_T: int) -> None:
         super().__init__()
-        C_input = history_steps * hid_S
-        self.st_block = nn.Sequential(
-            ConvNextBottle(dim=C_input, channels_hid=hid_S),
-            *[
-                ConvNextBlock(dim=C_input, channels_hid=hid_S)
-                for _ in range(N_T - 1)
-            ],
+        self.spatial_to_temporal = nn.Conv2d(2 * history_steps * hid_S, hid_T, 1)
+        self.cn_blocks = nn.Sequential(
+            ConvNextBottle(dim=hid_T, hidden_spatial=hid_S),
+            *[ConvNextBlock(dim=hid_T, hidden_spatial=hid_S) for _ in range(N_T - 1)],
         )
+        self.temporal_to_spatial = nn.Conv2d(hid_T, history_steps * hid_S, 1)
 
     def forward(self, x: torch.Tensor, time_emb: torch.Tensor) -> torch.Tensor:
         """
@@ -149,11 +147,13 @@ class Predictor(nn.Module):
         """
         B, T, C, H, W = x.shape
         x = x.reshape(B, T * C, H, W)
-        z = self.st_block[0](x, time_emb)
-        for i in range(1, len(self.st_block)):
-            z = self.st_block[i](z, time_emb)
-        y = z.reshape(B, -1, C, H, W)
-        return y
+        x = self.spatial_to_temporal(x)
+        x = self.cn_blocks[0](x, time_emb)
+        for i in range(1, len(self.cn_blocks)):
+            x = self.cn_blocks[i](x, time_emb)
+        x = self.temporal_to_spatial(x)
+        x = x.reshape(B, -1, C, H, W)
+        return x
 
 
 class SpatioTemporalRefinement(nn.Module):
@@ -208,7 +208,12 @@ class IAM4VP(nn.Module):
     """
 
     def __init__(
-        self, shape_in: torch.Size, hid_S: int = 64, hid_T: int = 512, N_S: int = 4, N_T: int = 6
+        self,
+        shape_in: torch.Size,
+        hid_S: int = 64,
+        hid_T: int = 512,
+        N_S: int = 4,
+        N_T: int = 6,
     ):
         super().__init__()
         T, C, H, W = shape_in
