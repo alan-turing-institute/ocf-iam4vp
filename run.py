@@ -214,11 +214,23 @@ def validate(
     )
 
     def plot(y: torch.Tensor, y_hat: torch.Tensor, name: str) -> None:
+        # Inputs have shape (C, H, W)
         y = y.detach().cpu()
         y_hat = y_hat.detach().cpu()
-        fig, (ax1, ax2) = plt.subplots(1, 2)
-        ax1.imshow(y, cmap="gray")
-        ax2.imshow(y_hat, cmap="gray")
+        fig, axs = plt.subplots(3, 2)
+        for ix, iy in np.ndindex(axs.shape):
+            axs[ix, iy].tick_params(left = False, right = False, labelleft = False, labelbottom = False, bottom = False)
+        axs[0, 0].set_ylabel("Channel 1")
+        axs[1, 0].set_ylabel("Channel 6")
+        axs[2, 0].set_ylabel("Channel 11")
+        axs[2, 0].set_xlabel("Ground truth")
+        axs[2, 1].set_xlabel("Prediction")
+        axs[0, 0].imshow(y[0], cmap="gray")
+        axs[1, 0].imshow(y[5], cmap="gray")
+        axs[2, 0].imshow(y[10], cmap="gray")
+        axs[0, 1].imshow(y_hat[0], cmap="gray")
+        axs[1, 1].imshow(y_hat[5], cmap="gray")
+        axs[2, 1].imshow(y_hat[10], cmap="gray")
         fig.savefig(f"{output_directory}/{name}.png")
         plt.close()
 
@@ -228,7 +240,7 @@ def validate(
             X = torch.from_numpy(X).swapaxes(1, 2).to(device)
             y = torch.from_numpy(y).swapaxes(1, 2).to(device)
             y_hat = model(X, times)
-            plot(y[0][0][0], y_hat[0][0], name=f"cloud-{idx}")
+            plot(y[0][0], y_hat[0], name=f"cloud-{idx}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
