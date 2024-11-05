@@ -185,6 +185,54 @@ class ConvSC(nn.Module):
         return self.conv(x)
 
 
+class ConvNextBase(nn.Module):
+    """
+    The ConvNeXt block with the depthwise convolution and recombination steps dropped
+
+    Args:
+        dim (int): Number of input channels.
+        drop_path (float): Stochastic depth rate. Default: 0.0
+        layer_scale_init_value (float): Init value for Layer Scale. Default: 1e-6.
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        drop_path: float = 0.0,
+        layer_scale_init_value: float = 1e-6,
+    ) -> None:
+        super().__init__()
+        self.cnl = ConvNextLayer(
+            ConvNextConfig(
+                hidden_act="gelu", layer_scale_init_value=layer_scale_init_value
+            ),
+            dim=dim,
+            drop_path=drop_path,
+        )
+
+    def forward(
+        self, x: torch.Tensor, time_emb: torch.Tensor | None = None
+    ) -> torch.Tensor:
+        """
+        Transformation summary
+
+        Inputs:
+            x: (batch_size, channels, height, width)
+
+        Outputs:
+            (batch_size, channels, height, width)
+        """
+        x = x.permute(0, 2, 3, 1)  # (N, C, H, W) -> (N, H, W, C)
+        x = self.cnl.layernorm(x)
+        x = self.cnl.pwconv1(x)
+        x = self.cnl.act(x)
+        x = self.cnl.pwconv2(x)
+        if self.cnl.layer_scale_parameter is not None:
+            x = self.cnl.layer_scale_parameter * x
+        x = x.permute(0, 3, 1, 2)  # (N, H, W, C) -> (N, C, H, W)
+        return x
+
+
 class ConvNextTimeEmbedLKA(nn.Module):
     """
     ConvNeXt block, with LKA instead of depth-wise convolution and adapted to add time embeddings.
