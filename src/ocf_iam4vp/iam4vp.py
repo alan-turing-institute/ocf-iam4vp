@@ -130,9 +130,9 @@ class Predictor(nn.Module):
         super().__init__()
         self.spatial_to_temporal = nn.Conv2d(2 * history_steps * hid_S, hid_T, 1)
         self.cn_blocks = nn.Sequential(
-            ConvNextTimeEmbed(dim=hid_T, hidden_spatial=hid_S),
+            ConvNextTimeEmbed(dim=hid_T, dim_time_embed=hid_S),
             *[
-                ConvNextTimeEmbedLKA(dim=hid_T, hidden_spatial=hid_S)
+                ConvNextTimeEmbedLKA(dim=hid_T, dim_time_embed=hid_S)
                 for _ in range(N_T - 1)
             ],
         )

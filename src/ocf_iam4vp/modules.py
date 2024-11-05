@@ -243,20 +243,19 @@ class ConvNextTimeEmbedLKA(nn.Module):
     def __init__(
         self,
         dim: int,
-        hidden_spatial: int = 64,
+        dim_time_embed: int = 64,
         drop_path: float = 0.0,
         layer_scale_init_value: float = 1e-6,
     ) -> None:
         super().__init__()
-        self.mlp = nn.Sequential(nn.GELU(), nn.Linear(hidden_spatial, dim))
-        self.dwconv = LargeKernelAttention(dim)
-        self.convnext = ConvNextLayer(
-            ConvNextConfig(
-                hidden_act="gelu", layer_scale_init_value=layer_scale_init_value
-            ),
+        self.mlp = nn.Sequential(nn.GELU(), nn.Linear(dim_time_embed, dim))
+        self.lka = LargeKernelAttention(dim)
+        self.cnb = ConvNextBase(
             dim=dim,
             drop_path=drop_path,
+            layer_scale_init_value=layer_scale_init_value,
         )
+        self.drop_path = self.cnb.cnl.drop_path
 
     def forward(
         self, x: torch.Tensor, time_emb: torch.Tensor | None = None
@@ -273,16 +272,9 @@ class ConvNextTimeEmbedLKA(nn.Module):
         """
         input = x
         time_emb = self.mlp(time_emb)
-        x = self.dwconv(x) + rearrange(time_emb, "b c -> b c 1 1")
-        x = x.permute(0, 2, 3, 1)  # (N, C, H, W) -> (N, H, W, C)
-        x = self.convnext.layernorm(x)
-        x = self.convnext.pwconv1(x)
-        x = self.convnext.act(x)
-        x = self.convnext.pwconv2(x)
-        if self.convnext.layer_scale_parameter is not None:
-            x = self.convnext.layer_scale_parameter * x
-        x = x.permute(0, 3, 1, 2)  # (N, H, W, C) -> (N, C, H, W)
-        x = input + self.convnext.drop_path(x)
+        x = self.lka(x) + rearrange(time_emb, "b c -> b c 1 1")
+        x = self.cnb(x)
+        x = input + self.drop_path(x)
         return x
 
 
@@ -296,19 +288,19 @@ class ConvNextTimeEmbed(nn.Module):
     def __init__(
         self,
         dim: int,
-        hidden_spatial: int,
+        dim_time_embed: int,
         drop_path: float = 0.0,
         layer_scale_init_value: float = 1e-6,
     ) -> None:
         super().__init__()
-        self.mlp = nn.Sequential(nn.GELU(), nn.Linear(hidden_spatial, dim))
-        self.convnext = ConvNextLayer(
-            ConvNextConfig(
-                hidden_act="gelu", layer_scale_init_value=layer_scale_init_value
-            ),
+        self.mlp = nn.Sequential(nn.GELU(), nn.Linear(dim_time_embed, dim))
+        self.cnb = ConvNextBase(
             dim=dim,
             drop_path=drop_path,
+            layer_scale_init_value=layer_scale_init_value,
         )
+        self.dwconv = self.cnb.cnl.dwconv
+        self.drop_path = self.cnb.cnl.drop_path
 
     def forward(
         self, x: torch.Tensor, time_emb: torch.Tensor | None = None
@@ -325,16 +317,9 @@ class ConvNextTimeEmbed(nn.Module):
         """
         input = x
         time_emb = self.mlp(time_emb)
-        x = self.convnext.dwconv(x) + rearrange(time_emb, "b c -> b c 1 1")
-        x = x.permute(0, 2, 3, 1)  # (N, C, H, W) -> (N, H, W, C)
-        x = self.convnext.layernorm(x)
-        x = self.convnext.pwconv1(x)
-        x = self.convnext.act(x)
-        x = self.convnext.pwconv2(x)
-        if self.convnext.layer_scale_parameter is not None:
-            x = self.convnext.layer_scale_parameter * x
-        x = x.permute(0, 3, 1, 2)  # (N, H, W, C) -> (N, C, H, W)
-        x = input + self.convnext.drop_path(x)
+        x = self.dwconv(x) + rearrange(time_emb, "b c -> b c 1 1")
+        x = self.cnb(x)
+        x = input + self.drop_path(x)
         return x
 
 
