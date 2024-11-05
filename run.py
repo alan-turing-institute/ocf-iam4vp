@@ -13,6 +13,7 @@ from cloudcasting.constants import (
 )
 from cloudcasting.dataset import SatelliteDataset
 from torch.utils.data import DataLoader
+from torchinfo import summary
 
 from ocf_iam4vp import IAM4VP
 
@@ -23,16 +24,56 @@ def seed_worker(worker_id):
     random.seed(worker_seed)
 
 
+def summarise(
+    batch_size: int,
+    device: str,
+    hidden_channels_space: int,
+    hidden_channels_time: int,
+    num_convolutions_space: int,
+    num_convolutions_time: int,
+    num_history_steps: int,
+) -> None:
+    # Create the model
+    model = IAM4VP(
+        (num_history_steps, NUM_CHANNELS, IMAGE_SIZE_TUPLE[0], IMAGE_SIZE_TUPLE[1]),
+        hid_S=hidden_channels_space,
+        hid_T=hidden_channels_time,
+        N_S=num_convolutions_space,
+        N_T=num_convolutions_time,
+    )
+    model = model.to(device)
+    model.train()
+
+    # Create some random inputs
+    batch_X = torch.randn(
+        batch_size,
+        num_history_steps,
+        NUM_CHANNELS,
+        IMAGE_SIZE_TUPLE[0],
+        IMAGE_SIZE_TUPLE[1],
+    )
+    times = torch.tensor(100).repeat(batch_X.shape[0]).to(device)
+
+    # Summarise the model
+    print(f"- batch-size: {batch_size}")
+    print(f"- hidden-channels-space: {hidden_channels_space}")
+    print(f"- hidden-channels-time: {hidden_channels_time}")
+    print(f"- num-convolutions-space: {num_convolutions_space}")
+    print(f"- num-convolutions-time: {num_convolutions_time}")
+    print(f"- num-history-steps: {num_history_steps}")
+    summary(model, input_data=(batch_X, [], times), device=device)
+
+
 def train(
     batch_size: int,
     device: str,
     forecast_steps: int,
     hidden_channels_space: int,
     hidden_channels_time: int,
-    history_steps: int,
     num_convolutions_space: int,
     num_convolutions_time: int,
     num_epochs: int,
+    num_history_steps: int,
     output_directory: pathlib.Path,
     training_data_path: str | list[str],
     num_workers: int = 0,
@@ -42,7 +83,7 @@ def train(
         zarr_path=training_data_path,
         start_time="2022-01-31",
         end_time=None,
-        history_mins=(history_steps - 1) * DATA_INTERVAL_SPACING_MINUTES,
+        history_mins=(num_history_steps - 1) * DATA_INTERVAL_SPACING_MINUTES,
         forecast_mins=forecast_steps * DATA_INTERVAL_SPACING_MINUTES,
         sample_freq_mins=DATA_INTERVAL_SPACING_MINUTES,
         nan_to_num=True,
@@ -61,7 +102,7 @@ def train(
 
     # Create the model
     model = IAM4VP(
-        (history_steps, NUM_CHANNELS, IMAGE_SIZE_TUPLE[0], IMAGE_SIZE_TUPLE[1]),
+        (num_history_steps, NUM_CHANNELS, IMAGE_SIZE_TUPLE[0], IMAGE_SIZE_TUPLE[1]),
         hid_S=hidden_channels_space,
         hid_T=hidden_channels_time,
         N_S=num_convolutions_space,
@@ -129,6 +170,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     cmd_group = parser.add_mutually_exclusive_group(required=True)
     cmd_group.add_argument("--train", action="store_true", help="Run training")
+    cmd_group.add_argument(
+        "--summarise", action="store_true", help="Print a model summary"
+    )
     cmd_group.add_argument("--validate", action="store_true", help="Run validation")
     parser.add_argument("--batch-size", type=int, help="Batch size", default=2)
     parser.add_argument("--data-path", type=str, help="Path to the input data")
@@ -178,8 +222,9 @@ if __name__ == "__main__":
     )
 
     # Ensure output directory exists
-    output_directory = pathlib.Path(args.output_directory)
-    output_directory.mkdir(parents=True, exist_ok=True)
+    if args.output_directory:
+        output_directory = pathlib.Path(args.output_directory)
+        output_directory.mkdir(parents=True, exist_ok=True)
 
     if args.train:
         training_data_path = [
@@ -191,12 +236,22 @@ if __name__ == "__main__":
             forecast_steps=args.num_forecast_steps,
             hidden_channels_space=args.hidden_channels_space,
             hidden_channels_time=args.hidden_channels_time,
-            history_steps=args.num_history_steps,
             num_convolutions_space=args.num_convolutions_space,
             num_convolutions_time=args.num_convolutions_time,
             num_epochs=args.num_epochs,
+            num_history_steps=args.num_history_steps,
             output_directory=output_directory,
             training_data_path=training_data_path,
+        )
+    if args.summarise:
+        summarise(
+            batch_size=args.batch_size,
+            device=device,
+            hidden_channels_space=args.hidden_channels_space,
+            hidden_channels_time=args.hidden_channels_time,
+            num_convolutions_space=args.num_convolutions_space,
+            num_convolutions_time=args.num_convolutions_time,
+            num_history_steps=args.num_history_steps,
         )
     if args.validate:
         print("Validation is not currently supported")
