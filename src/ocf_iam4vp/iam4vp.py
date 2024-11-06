@@ -233,8 +233,8 @@ class IAM4VP(nn.Module):
     def forward(
         self,
         x_raw: torch.Tensor,
-        t_raw: torch.Tensor,
         y_raw: list[torch.Tensor] = [],
+        t_raw: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """
         Transformation summary
@@ -266,8 +266,11 @@ class IAM4VP(nn.Module):
         priors_latent = mask_token
         combined_latent = torch.cat([x_latent, priors_latent], dim=1)
 
+        # Construct time embedding
+        times = t_raw if t_raw else torch.tensor(100).repeat(B).to(x.device)
+        time_emb = self.time_mlp(times)
+
         # Run predictor on combined latent data + time embedding
-        time_emb = self.time_mlp(t_raw)
         hid = self.hid(combined_latent, time_emb)
         hid = hid.reshape(B * T, C_, H_, W_)
 

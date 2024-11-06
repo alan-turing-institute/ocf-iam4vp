@@ -55,8 +55,6 @@ def summarise(
         IMAGE_SIZE_TUPLE[0],
         IMAGE_SIZE_TUPLE[1],
     )
-    times = torch.tensor(100).repeat(batch_X.shape[0]).to(device)
-
     # Summarise the model
     print(f"- batch-size: {batch_size}")
     print(f"- hidden-channels-space: {hidden_channels_space}")
@@ -65,7 +63,7 @@ def summarise(
     print(f"- num-convolutions-time: {num_convolutions_time}")
     print(f"- num-forecast-steps: {num_forecast_steps}")
     print(f"- num-history-steps: {num_history_steps}")
-    summary(model, input_data=(batch_X, times, []), device=device)
+    summary(model, input_data=(batch_X, [], None), device=device)
 
 
 def train(
@@ -140,7 +138,7 @@ def train(
                 times = torch.tensor(f_step * 100).repeat(batch_X.shape[0]).to(device)
 
                 # Forward pass for the next time step
-                y_hat = model(batch_X, times, y_hats)
+                y_hat = model(batch_X, y_hats, times)
 
                 # Calculate the loss
                 loss = criterion(y_hat, batch_y[:, f_step, :, :, :])
@@ -169,6 +167,7 @@ def train(
             )
             save_model = False
 
+
 def validate(
     batch_size: int,
     device: str,
@@ -190,7 +189,9 @@ def validate(
         N_S=num_convolutions_space,
         N_T=num_convolutions_time,
     )
-    model.load_state_dict(torch.load(state_dict_path, map_location=device, weights_only=True))
+    model.load_state_dict(
+        torch.load(state_dict_path, map_location=device, weights_only=True)
+    )
     model = model.to(device)
     model.eval()
 
@@ -219,7 +220,13 @@ def validate(
         y_hat = y_hat.detach().cpu()
         fig, axs = plt.subplots(3, 2)
         for ix, iy in np.ndindex(axs.shape):
-            axs[ix, iy].tick_params(left = False, right = False, labelleft = False, labelbottom = False, bottom = False)
+            axs[ix, iy].tick_params(
+                left=False,
+                right=False,
+                labelleft=False,
+                labelbottom=False,
+                bottom=False,
+            )
         axs[0, 0].set_ylabel("Channel 1")
         axs[1, 0].set_ylabel("Channel 6")
         axs[2, 0].set_ylabel("Channel 11")
@@ -234,13 +241,13 @@ def validate(
         fig.savefig(f"{output_directory}/{name}.png")
         plt.close()
 
-    times = torch.tensor(100).repeat(batch_size).to(device)
     for idx, (X, y) in enumerate(tqdm.tqdm(valid_dataloader)):
         if idx % 100 == 0:
             X = torch.from_numpy(X).swapaxes(1, 2).to(device)
             y = torch.from_numpy(y).swapaxes(1, 2).to(device)
-            y_hat = model(X, times)
+            y_hat = model(X, [], None)
             plot(y[0][0], y_hat[0], name=f"cloud-{idx}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
