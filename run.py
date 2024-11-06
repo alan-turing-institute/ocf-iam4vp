@@ -304,6 +304,14 @@ if __name__ == "__main__":
         else "cuda" if torch.cuda.is_available() else "cpu"
     )
 
+    # Apply constraints on timesteps
+    if args.num_forecast_steps > args.num_history_steps:
+        msg = f"--num-forecast-steps must be no greater than --num-history-steps for time embedding to work."
+        raise ValueError(msg)
+    if args.num_history_steps < NUM_FORECAST_STEPS:
+        msg = f"--num-history-steps must be at least {NUM_FORECAST_STEPS} for validation to work."
+        raise ValueError(msg)
+
     # Ensure output directory exists
     if args.output_directory:
         output_directory = pathlib.Path(args.output_directory)
