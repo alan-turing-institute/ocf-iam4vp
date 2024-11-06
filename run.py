@@ -258,6 +258,9 @@ def validate(
             X = torch.from_numpy(X).swapaxes(1, 2).to(device)
             y = torch.from_numpy(y).swapaxes(1, 2).to(device)
             y_hat = model(X, [], None)
+            # Restrict prediction to the range (0, 1) or -1
+            y_hat[y_hat < 0] = -1
+            y_hat[y_hat > 1] = 1
             plot(y[0][0], y_hat[0], name=f"cloud-{idx}")
 
 
