@@ -122,7 +122,7 @@ def train(
     best_loss = 999
     best_model = None
     save_model = False
-    for epoch in range(num_epochs):
+    for epoch in range(1, num_epochs + 1):
         # Load existing model if there is one
         with suppress(StopIteration):
             existing_state_dict = next(output_directory.glob(f"best-model-epoch-{epoch}-*"))
@@ -169,7 +169,7 @@ def train(
                 y_hats.append(y_hat.detach())
 
         print(
-            f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}, Best loss {best_loss:.4f}"
+            f"Epoch [{epoch}/{num_epochs}], Loss: {loss.item():.4f}, Best loss {best_loss:.4f}"
         )
         if save_model:
             torch.save(
