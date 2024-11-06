@@ -1,0 +1,19 @@
+model:
+  name: "IAM4VPCloudcaster"
+  params:
+    hidden_channels_space: 64
+    hidden_channels_time: 256
+    num_convolutions_space: 4
+    num_convolutions_time: 6
+    num_forecast_steps: 8
+    num_history_steps: 16
+    num_training_epochs: 1
+    state_dict_path: /bask/projects/v/vjgo8416-climate/users/saoq4015/models/iam4vp/batch-1-forecast-8-history-16-hcs-64-hct-256-ns-4-nt-6/best-model-epoch-0-loss-0.000435.state-dict.pt
+    version: "0.1.0"
+validation:
+  data_path: "/bask/projects/v/vjgo8416-climate/shared/data/eumetsat/testing2022/2022_test_nonhrv.zarr"
+  wandb_project_name: "cloudcasting"
+  wandb_run_name: "IAM4VP-validation"
+  nan_to_num: False
+  batch_size: 2
+  num_workers: 0
