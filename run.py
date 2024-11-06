@@ -1,6 +1,7 @@
 import argparse
 import pathlib
 import random
+from contextlib import suppress
 
 import numpy as np
 import torch
@@ -10,6 +11,7 @@ from cloudcasting.constants import (
     DATA_INTERVAL_SPACING_MINUTES,
     IMAGE_SIZE_TUPLE,
     NUM_CHANNELS,
+    NUM_FORECAST_STEPS,
 )
 from cloudcasting.dataset import SatelliteDataset, ValidationSatelliteDataset
 from cloudcasting.utils import numpy_validation_collate_fn
@@ -121,6 +123,16 @@ def train(
     best_model = None
     save_model = False
     for epoch in range(num_epochs):
+        # Load existing model if there is one
+        with suppress(StopIteration):
+            existing_state_dict = next(output_directory.glob(f"best-model-epoch-{epoch}-*"))
+            print(f"Found existing model for epoch {epoch}")
+            model.load_state_dict(
+                torch.load(existing_state_dict, map_location=device, weights_only=True)
+            )
+            print(f"Skipping epoch {epoch} after loading weights from existing model")
+            break
+
         # Set model to training mode
         model.train()
 
