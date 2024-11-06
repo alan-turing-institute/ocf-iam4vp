@@ -9,7 +9,7 @@ model:
     num_history_steps: 16
     num_training_epochs: 1
     state_dict_path: /bask/projects/v/vjgo8416-climate/users/saoq4015/models/iam4vp/batch-1-forecast-8-history-16-hcs-64-hct-256-ns-4-nt-6/best-model-epoch-0-loss-0.000435.state-dict.pt
-    version: "0.1.0"
+    version: "0.1.1"
 validation:
   data_path: "/bask/projects/v/vjgo8416-climate/shared/data/eumetsat/testing2022/2022_test_nonhrv.zarr"
   wandb_project_name: "cloudcasting"
