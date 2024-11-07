@@ -268,7 +268,7 @@ class IAM4VP(nn.Module):
         combined_latent = torch.cat([x_latent, priors_latent], dim=1)
 
         # Construct time embedding
-        times = t_raw if t_raw else torch.tensor(100).repeat(B).to(x.device)
+        times = torch.tensor(100).repeat(B).to(x.device) if t_raw is None else t_raw
         time_emb = self.time_mlp(times)
 
         # Run predictor on combined latent data + time embedding
