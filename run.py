@@ -124,7 +124,9 @@ def train(
     for epoch in range(1, num_epochs + 1):
         # Load existing model if there is one
         with suppress(StopIteration):
-            existing_state_dict = next(output_directory.glob(f"best-model-epoch-{epoch}-*"))
+            existing_state_dict = next(
+                output_directory.glob(f"best-model-epoch-{epoch}-*")
+            )
             print(f"Found existing model for epoch {epoch}")
             model.load_state_dict(
                 torch.load(existing_state_dict, map_location=device, weights_only=True)
@@ -134,6 +136,15 @@ def train(
 
         # Set model to training mode
         model.train()
+
+        # Set checkpoint paths
+        best_candidate_path = (
+            output_directory / f"best-current-model-epoch-{epoch}.state-dict.pt"
+        )
+        best_model_path = (
+            output_directory
+            / f"best-model-epoch-{epoch}-loss-{best_loss:.3g}.state-dict.pt"
+        )
 
         for batch_X, batch_y in tqdm.tqdm(train_dataloader):
             # Send batch tensors to the current device
@@ -161,11 +172,8 @@ def train(
                 # Update best model so-far if appropriate
                 if loss.item() < best_loss:
                     best_loss = loss.item()
-                    torch.save(
-                        model.state_dict(),
-                        output_directory
-                        / f"best-current-model-epoch-{epoch}.state-dict.pt",
-                    )
+                    pathlib.Path.unlink(best_candidate_path, missing_ok=True)
+                    torch.save(model.state_dict(), best_candidate_path)
 
                 # Append latest prediction to queue
                 y_hats.append(y_hat.detach())
@@ -176,10 +184,8 @@ def train(
         print(
             f"Epoch [{epoch}/{num_epochs}], Loss: {loss.item():.4f}, Best loss {best_loss:.4f}"
         )
-        shutil.move(
-            output_directory / f"best-current-model-epoch-{epoch}.state-dict.pt",
-            output_directory / f"best-model-epoch-{epoch}-loss-{best_loss:.3g}.state-dict.pt",
-        )
+        pathlib.Path.unlink(best_model_path, missing_ok=True)
+        shutil.move(best_candidate_path, best_model_path)
 
 
 def validate(
@@ -229,7 +235,7 @@ def validate(
 
     def plot_channels(y: np.ndarray, y_hat: np.ndarray, name: str) -> None:
         """Plot comparison across channels for inputs with shape (C, H, W)"""
-        assert(y.shape == y_hat.shape)
+        assert y.shape == y_hat.shape
         fig, axs = plt.subplots(3, 2)
         for ix, iy in np.ndindex(axs.shape):
             axs[ix, iy].tick_params(
@@ -255,7 +261,7 @@ def validate(
 
     def plot_times(y: np.ndarray, y_hat: np.ndarray, name: str) -> None:
         """Plot comparison across times for inputs with shape (T, H, W)"""
-        assert(y.shape == y_hat.shape)
+        assert y.shape == y_hat.shape
         fig, axs = plt.subplots(3, 2)
         for ix, iy in np.ndindex(axs.shape):
             axs[ix, iy].tick_params(
