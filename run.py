@@ -210,11 +210,10 @@ def validate(
     model.eval()
 
     # Set up the validation dataset
-    num_forecast_steps = 1
     valid_dataset = ValidationSatelliteDataset(
         zarr_path=validation_data_path,
         history_mins=(num_history_steps - 1) * DATA_INTERVAL_SPACING_MINUTES,
-        forecast_mins=num_forecast_steps * DATA_INTERVAL_SPACING_MINUTES,
+        forecast_mins=NUM_FORECAST_STEPS * DATA_INTERVAL_SPACING_MINUTES,
         sample_freq_mins=DATA_INTERVAL_SPACING_MINUTES,
         nan_to_num=True,
     )
@@ -258,16 +257,35 @@ def validate(
         if idx % 100 == 0:
             # Disable gradient calculation in evaluate mode
             with torch.no_grad():
-                X = torch.from_numpy(X).swapaxes(1, 2).to(device)
-                y_hat = model(X, [], None)
-                # Note that y_hat has shape (batch_size, channels, height, width)
+                # Swap axes so that batch_X is (batch_size, time, channels, height, width)
+                batch_X = torch.from_numpy(X).swapaxes(1, 2).to(device)
 
-                # Restrict prediction to the range (0, 1) or -1
-                y_hat[y_hat < 0] = -1
-                y_hat[y_hat > 1] = 1
+                # Produce a forecast for each timestep in y
+                y_hats = []
+                for f_step in range(y.shape[2]):
+                    # Generate an appropriately-sized set of blank times
+                    times = torch.tensor(f_step * 100).repeat(batch_X.shape[0]).to(device)
+                    # Forward pass for the next time step
+                    y_hat: torch.Tensor = model(batch_X, y_hats, times)
+                    # Store the prediction
+                    # Note that y_hat has shape (batch_size, channels, height, width)
+                    y_hats.append(y_hat.detach())
+                    del times
+
+                # Convert results to (batch_size, channels, time, height, width)
+                # - Add a time axis
+                # - convert from Tensor to numpy array
+                # - concatenate the forecasts along the time axis
+                # - ensure data is in the range (0, 1) or -1
+                y_hat_np = [y_hat[:, :, None, :, :].cpu().numpy() for y_hat in y_hats]
+                y_hat_concat = np.concatenate(y_hat_np, axis=2)
+                y_hat_concat[y_hat_concat < 0] = -1
+                y_hat_concat[y_hat_concat > 1] = 1
+
+                # Plot channels for timestep 1
                 y_t1 = y[0, :, 0, :, :]
-                y_hat_t1 = y_hat[0].detach().cpu().numpy()
-                plot_channels(y_t1, y_hat_t1, name=f"cloud-{idx}")
+                y_hat_t1 = y_hat_concat[0, :, 0, :, :]
+                plot_channels(y_t1, y_hat_t1, name=f"cloud-channels-t1-{idx}")
 
                 # Plotting/prediction cleanup
                 del y_hat, y_t1, y_hat_t1
