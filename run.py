@@ -228,8 +228,9 @@ def validate(
         drop_last=False,
     )
 
-    def plot(y: np.ndarray, y_hat: np.ndarray, name: str) -> None:
-        # Inputs have shape (C, H, W)
+    def plot_channels(y: np.ndarray, y_hat: np.ndarray, name: str) -> None:
+        """Plot comparison across channels for inputs with shape (C, H, W)"""
+        assert(y.shape == y_hat.shape)
         fig, axs = plt.subplots(3, 2)
         for ix, iy in np.ndindex(axs.shape):
             axs[ix, iy].tick_params(
@@ -258,18 +259,18 @@ def validate(
             # Disable gradient calculation in evaluate mode
             with torch.no_grad():
                 X = torch.from_numpy(X).swapaxes(1, 2).to(device)
-                y = torch.from_numpy(y).swapaxes(1, 2).to(device)
                 y_hat = model(X, [], None)
+                # Note that y_hat has shape (batch_size, channels, height, width)
 
                 # Restrict prediction to the range (0, 1) or -1
                 y_hat[y_hat < 0] = -1
                 y_hat[y_hat > 1] = 1
-                y_np = y[0][0].detach().cpu().numpy()
-                y_hat_np = y_hat[0].detach().cpu().numpy()
-                plot(y_np, y_hat_np, name=f"cloud-{idx}")
+                y_t1 = y[0, :, 0, :, :]
+                y_hat_t1 = y_hat[0].detach().cpu().numpy()
+                plot_channels(y_t1, y_hat_t1, name=f"cloud-{idx}")
 
                 # Plotting/prediction cleanup
-                del y_hat, y_np, y_hat_np
+                del y_hat, y_t1, y_hat_t1
 
         # Iteration cleanup
         del X, y
