@@ -329,9 +329,11 @@ class IAM4VP(nn.Module):
             # - convert from Tensor to numpy array
             # - concatenate the forecasts along the time axis
             # - ensure data is in the range (0, 1)
+            # - remove any NaNs
             y_hat_np = [y_hat[:, :, None, :, :].cpu().numpy() for y_hat in y_hats]
             y_hat_concat = np.concatenate(y_hat_np, axis=2)
             y_hat_concat = y_hat_concat.clip(0, 1)
+            y_hat_concat = np.nan_to_num(y_hat_concat, nan=0, posinf=0)
 
             # Cleanup predictions
             for y_hat in y_hats:
