@@ -1,6 +1,7 @@
 import argparse
 import pathlib
 import random
+import shutil
 from contextlib import suppress
 
 import numpy as np
@@ -120,8 +121,6 @@ def train(
 
     # Training loop
     best_loss = 999
-    best_model = None
-    save_model = False
     for epoch in range(1, num_epochs + 1):
         # Load existing model if there is one
         with suppress(StopIteration):
@@ -162,8 +161,11 @@ def train(
                 # Update best model so-far if appropriate
                 if loss.item() < best_loss:
                     best_loss = loss.item()
-                    best_model = model
-                    save_model = True
+                    torch.save(
+                        model.state_dict(),
+                        output_directory
+                        / f"best-current-model-epoch-{epoch}.state-dict.pt",
+                    )
 
                 # Append latest prediction to queue
                 y_hats.append(y_hat.detach())
@@ -174,13 +176,10 @@ def train(
         print(
             f"Epoch [{epoch}/{num_epochs}], Loss: {loss.item():.4f}, Best loss {best_loss:.4f}"
         )
-        if save_model:
-            torch.save(
-                best_model.state_dict(),
-                output_directory
-                / f"best-model-epoch-{epoch}-loss-{best_loss:.3g}.state-dict.pt",
-            )
-            save_model = False
+        shutil.move(
+            output_directory / f"best-current-model-epoch-{epoch}.state-dict.pt",
+            output_directory / f"best-model-epoch-{epoch}-loss-{best_loss:.3g}.state-dict.pt",
+        )
 
 
 def validate(
