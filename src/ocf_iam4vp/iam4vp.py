@@ -328,12 +328,10 @@ class IAM4VP(nn.Module):
             # - Add a time axis
             # - convert from Tensor to numpy array
             # - concatenate the forecasts along the time axis
-            # - ensure data is in the range (0, 1) or -1
+            # - ensure data is in the range (0, 1)
             y_hat_np = [y_hat[:, :, None, :, :].cpu().numpy() for y_hat in y_hats]
             y_hat_concat = np.concatenate(y_hat_np, axis=2)
-            y_hat_concat[y_hat_concat < 0] = -1
-            y_hat_concat[y_hat_concat > 1] = 1
-            y_hat_concat = np.nan_to_num(y_hat_concat, nan=-1, posinf=1)
+            y_hat_concat = y_hat_concat.clip(0, 1)
 
             # Cleanup predictions
             for y_hat in y_hats:
