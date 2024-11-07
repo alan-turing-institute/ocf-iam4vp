@@ -253,6 +253,32 @@ def validate(
         fig.savefig(f"{output_directory}/{name}.png")
         plt.close()
 
+    def plot_times(y: np.ndarray, y_hat: np.ndarray, name: str) -> None:
+        """Plot comparison across times for inputs with shape (T, H, W)"""
+        assert(y.shape == y_hat.shape)
+        fig, axs = plt.subplots(3, 2)
+        for ix, iy in np.ndindex(axs.shape):
+            axs[ix, iy].tick_params(
+                left=False,
+                right=False,
+                labelleft=False,
+                labelbottom=False,
+                bottom=False,
+            )
+        axs[0, 0].set_ylabel("Time 1")
+        axs[1, 0].set_ylabel("Time 6")
+        axs[2, 0].set_ylabel("Time 12")
+        axs[2, 0].set_xlabel("Ground truth")
+        axs[2, 1].set_xlabel("Prediction")
+        axs[0, 0].imshow(y[0], cmap="gray")
+        axs[1, 0].imshow(y[5], cmap="gray")
+        axs[2, 0].imshow(y[11], cmap="gray")
+        axs[0, 1].imshow(y_hat[0], cmap="gray")
+        axs[1, 1].imshow(y_hat[5], cmap="gray")
+        axs[2, 1].imshow(y_hat[11], cmap="gray")
+        fig.savefig(f"{output_directory}/{name}.png")
+        plt.close()
+
     for idx, (X, y) in enumerate(tqdm.tqdm(valid_dataloader)):
         if idx % 100 == 0:
             # Disable gradient calculation in evaluate mode
@@ -271,6 +297,7 @@ def validate(
                     # Note that y_hat has shape (batch_size, channels, height, width)
                     y_hats.append(y_hat.detach())
                     del times
+                del batch_X
 
                 # Convert results to (batch_size, channels, time, height, width)
                 # - Add a time axis
@@ -281,14 +308,22 @@ def validate(
                 y_hat_concat = np.concatenate(y_hat_np, axis=2)
                 y_hat_concat[y_hat_concat < 0] = -1
                 y_hat_concat[y_hat_concat > 1] = 1
+                del y_hats
 
                 # Plot channels for timestep 1
                 y_t1 = y[0, :, 0, :, :]
                 y_hat_t1 = y_hat_concat[0, :, 0, :, :]
                 plot_channels(y_t1, y_hat_t1, name=f"cloud-channels-t1-{idx}")
+                del y_t1, y_hat_t1
+
+                # Plot video for channel 6
+                y_c6 = y[0, 5, :, :, :]
+                y_hat_c6 = y_hat_concat[0, 5, :, :, :]
+                plot_times(y_c6, y_hat_c6, name=f"cloud-times-c6-{idx}")
+                del y_c6, y_hat_c6
 
                 # Plotting/prediction cleanup
-                del y_hat, y_t1, y_hat_t1
+                del y_hat_concat
 
         # Iteration cleanup
         del X, y
