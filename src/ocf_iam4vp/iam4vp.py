@@ -1,5 +1,6 @@
 """Implementation of IAM4VP from https://github.com/seominseok0429/Implicit-Stacked-Autoregressive-Model-for-Video-Prediction"""
 
+import numpy as np
 import torch
 from torch import nn
 
@@ -279,3 +280,64 @@ class IAM4VP(nn.Module):
 
         # Perform STR and return
         return self.str(Y)
+
+    def predict(
+        self,
+        X: np.ndarray,
+        n_forecast_steps: int,
+        device: str,
+    ) -> torch.Tensor:
+        """
+        Make predictions with a trained model
+
+        Inputs:
+            X [numpy array]: (batch_size, channels, time, height, width)
+            n_forecast_steps [int]: number of steps to forecast
+            device [str]: Which PyTorch device to use
+
+        Outputs:
+            y_hat [numpy array]: (batch_size, channels, n_forecast_steps, height, width)
+        """
+        # Disable gradient calculation in evaluate mode
+        with torch.no_grad():
+
+            # Load data into tensor with shape (batch_size, time, channels, height, width)
+            batch_X = torch.from_numpy(X).swapaxes(1, 2).to(device)
+
+            # Generate the requested number of forecasts
+            y_hats: list[torch.Tensor] = []
+            for f_step in range(n_forecast_steps):
+
+                # Generate an appropriately-sized set of blank times
+                times = torch.tensor(f_step * 100).repeat(batch_X.shape[0]).to(device)
+
+                # Forward pass for the next time step
+                y_hat: torch.Tensor = self(batch_X, y_hats, times)
+
+                # Store the prediction
+                # Note that y_hat has shape (batch_size, channels, height, width)
+                y_hats.append(y_hat.detach())
+
+                # Cleanup loop variables
+                del times
+
+            # Cleanup inputs
+            del batch_X
+
+            # Convert results to the expected output format by doing the following:
+            # - Add a time axis
+            # - convert from Tensor to numpy array
+            # - concatenate the forecasts along the time axis
+            # - ensure data is in the range (0, 1) or -1
+            y_hat_np = [y_hat[:, :, None, :, :].cpu().numpy() for y_hat in y_hats]
+            y_hat_concat = np.concatenate(y_hat_np, axis=2)
+            y_hat_concat[y_hat_concat < 0] = -1
+            y_hat_concat[y_hat_concat > 1] = 1
+            y_hat_concat = np.nan_to_num(y_hat_concat, nan=-1, posinf=1)
+
+            # Cleanup predictions
+            for y_hat in y_hats:
+                del y_hat
+
+        # Return concatenated output
+        return y_hat_concat

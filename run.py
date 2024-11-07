@@ -281,49 +281,23 @@ def validate(
 
     for idx, (X, y) in enumerate(tqdm.tqdm(valid_dataloader)):
         if idx % 100 == 0:
-            # Disable gradient calculation in evaluate mode
-            with torch.no_grad():
-                # Swap axes so that batch_X is (batch_size, time, channels, height, width)
-                batch_X = torch.from_numpy(X).swapaxes(1, 2).to(device)
+            y_hats = model.predict(X, y.shape[2], device)
 
-                # Produce a forecast for each timestep in y
-                y_hats = []
-                for f_step in range(y.shape[2]):
-                    # Generate an appropriately-sized set of blank times
-                    times = torch.tensor(f_step * 100).repeat(batch_X.shape[0]).to(device)
-                    # Forward pass for the next time step
-                    y_hat: torch.Tensor = model(batch_X, y_hats, times)
-                    # Store the prediction
-                    # Note that y_hat has shape (batch_size, channels, height, width)
-                    y_hats.append(y_hat.detach())
-                    del times
-                del batch_X
+            # Plot channels for timestep 1
+            y_t1 = y[0, :, 0, :, :]
+            y_hat_t1 = y_hats[0, :, 0, :, :]
+            plot_channels(y_t1, y_hat_t1, name=f"cloud-channels-t1-{idx}")
+            del y_t1, y_hat_t1
 
-                # Convert results to (batch_size, channels, time, height, width)
-                # - Add a time axis
-                # - convert from Tensor to numpy array
-                # - concatenate the forecasts along the time axis
-                # - ensure data is in the range (0, 1) or -1
-                y_hat_np = [y_hat[:, :, None, :, :].cpu().numpy() for y_hat in y_hats]
-                y_hat_concat = np.concatenate(y_hat_np, axis=2)
-                y_hat_concat[y_hat_concat < 0] = -1
-                y_hat_concat[y_hat_concat > 1] = 1
-                del y_hats
+            # Plot video for channel 6
+            y_c6 = y[0, 5, :, :, :]
+            y_hat_c6 = y_hats[0, 5, :, :, :]
+            plot_times(y_c6, y_hat_c6, name=f"cloud-times-c6-{idx}")
+            del y_c6, y_hat_c6
 
-                # Plot channels for timestep 1
-                y_t1 = y[0, :, 0, :, :]
-                y_hat_t1 = y_hat_concat[0, :, 0, :, :]
-                plot_channels(y_t1, y_hat_t1, name=f"cloud-channels-t1-{idx}")
-                del y_t1, y_hat_t1
-
-                # Plot video for channel 6
-                y_c6 = y[0, 5, :, :, :]
-                y_hat_c6 = y_hat_concat[0, 5, :, :, :]
-                plot_times(y_c6, y_hat_c6, name=f"cloud-times-c6-{idx}")
-                del y_c6, y_hat_c6
-
-                # Plotting/prediction cleanup
-                del y_hat_concat
+            # Plotting/prediction cleanup
+            del y_hats
+            break
 
         # Iteration cleanup
         del X, y
