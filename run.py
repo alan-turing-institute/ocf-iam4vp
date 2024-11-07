@@ -130,7 +130,7 @@ def train(
                 torch.load(existing_state_dict, map_location=device, weights_only=True)
             )
             print(f"Skipping epoch {epoch} after loading weights from existing model")
-            break
+            continue
 
         # Set model to training mode
         model.train()
@@ -297,7 +297,6 @@ def validate(
 
             # Plotting/prediction cleanup
             del y_hats
-            break
 
         # Iteration cleanup
         del X, y
