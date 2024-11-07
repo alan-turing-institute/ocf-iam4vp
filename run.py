@@ -168,6 +168,9 @@ def train(
                 # Append latest prediction to queue
                 y_hats.append(y_hat.detach())
 
+                # Free up memory
+                del loss
+
         print(
             f"Epoch [{epoch}/{num_epochs}], Loss: {loss.item():.4f}, Best loss {best_loss:.4f}"
         )
@@ -226,10 +229,8 @@ def validate(
         drop_last=False,
     )
 
-    def plot(y: torch.Tensor, y_hat: torch.Tensor, name: str) -> None:
+    def plot(y: np.ndarray, y_hat: np.ndarray, name: str) -> None:
         # Inputs have shape (C, H, W)
-        y = y.detach().cpu()
-        y_hat = y_hat.detach().cpu()
         fig, axs = plt.subplots(3, 2)
         for ix, iy in np.ndindex(axs.shape):
             axs[ix, iy].tick_params(
@@ -261,7 +262,11 @@ def validate(
             # Restrict prediction to the range (0, 1) or -1
             y_hat[y_hat < 0] = -1
             y_hat[y_hat > 1] = 1
-            plot(y[0][0], y_hat[0], name=f"cloud-{idx}")
+            y_np = y[0][0].detach().cpu().numpy()
+            y_hat_np = y_hat[0].detach().cpu().numpy()
+            plot(y_np, y_hat_np, name=f"cloud-{idx}")
+            del y_hat
+        del X, y
 
 
 if __name__ == "__main__":
