@@ -72,33 +72,36 @@ class IAM4VPCloudcaster(AbstractModel):
         # The input X is a numpy array with shape (batch_size, channels, time, height, width)
         # The output y_hat is a numpy array with shape (batch_size, channels, time, height, width)
 
-        # Load data into tensor with shape (batch_size, time, channels, height, width)
-        batch_X = torch.from_numpy(X).swapaxes(1, 2).to(self.device)
+        # Disable gradient calculation in evaluate mode
+        with torch.no_grad():
 
-        # Forecast NUM_FORECAST_STEPS steps
-        y_hats: list[torch.Tensor] = []
-        for f_step in range(NUM_FORECAST_STEPS):
+            # Load data into tensor with shape (batch_size, time, channels, height, width)
+            batch_X = torch.from_numpy(X).swapaxes(1, 2).to(self.device)
 
-            # Generate an appropriately-sized set of blank times
-            times = torch.tensor(f_step * 100).repeat(batch_X.shape[0]).to(self.device)
+            # Forecast NUM_FORECAST_STEPS steps
+            y_hats: list[torch.Tensor] = []
+            for f_step in range(NUM_FORECAST_STEPS):
 
-            # Forward pass for the next time step
-            y_hat = self.model(batch_X, y_hats, times)
+                # Generate an appropriately-sized set of blank times
+                times = torch.tensor(f_step * 100).repeat(batch_X.shape[0]).to(self.device)
 
-            # Store the prediction
-            # Note that y_hat has shape (batch_size, channels, height, width)
-            y_hats.append(y_hat.detach())
+                # Forward pass for the next time step
+                y_hat = self.model(batch_X, y_hats, times)
 
-        # Convert results to the expected output format by doing the following:
-        # - Add a time axis
-        # - convert from Tensor to numpy array
-        # - concatenate the forecasts along the time axis
-        # - ensure data is in the range (0, 1) or -1
-        y_hat_np = [y_hat[:, :, None, :, :].cpu().numpy() for y_hat in y_hats]
-        y_hat_concat = np.concatenate(y_hat_np, axis=2)
-        y_hat_concat[y_hat_concat < 0] = -1
-        y_hat_concat[y_hat_concat > 1] = 1
-        return np.nan_to_num(y_hat_concat, nan=-1, posinf=1)
+                # Store the prediction
+                # Note that y_hat has shape (batch_size, channels, height, width)
+                y_hats.append(y_hat.detach())
+
+            # Convert results to the expected output format by doing the following:
+            # - Add a time axis
+            # - convert from Tensor to numpy array
+            # - concatenate the forecasts along the time axis
+            # - ensure data is in the range (0, 1) or -1
+            y_hat_np = [y_hat[:, :, None, :, :].cpu().numpy() for y_hat in y_hats]
+            y_hat_concat = np.concatenate(y_hat_np, axis=2)
+            y_hat_concat[y_hat_concat < 0] = -1
+            y_hat_concat[y_hat_concat > 1] = 1
+            return np.nan_to_num(y_hat_concat, nan=-1, posinf=1)
 
     def hyperparameters_dict(self) -> dict[str, str]:
         """

@@ -255,16 +255,23 @@ def validate(
 
     for idx, (X, y) in enumerate(tqdm.tqdm(valid_dataloader)):
         if idx % 100 == 0:
-            X = torch.from_numpy(X).swapaxes(1, 2).to(device)
-            y = torch.from_numpy(y).swapaxes(1, 2).to(device)
-            y_hat = model(X, [], None)
-            # Restrict prediction to the range (0, 1) or -1
-            y_hat[y_hat < 0] = -1
-            y_hat[y_hat > 1] = 1
-            y_np = y[0][0].detach().cpu().numpy()
-            y_hat_np = y_hat[0].detach().cpu().numpy()
-            plot(y_np, y_hat_np, name=f"cloud-{idx}")
-            del y_hat
+            # Disable gradient calculation in evaluate mode
+            with torch.no_grad():
+                X = torch.from_numpy(X).swapaxes(1, 2).to(device)
+                y = torch.from_numpy(y).swapaxes(1, 2).to(device)
+                y_hat = model(X, [], None)
+
+                # Restrict prediction to the range (0, 1) or -1
+                y_hat[y_hat < 0] = -1
+                y_hat[y_hat > 1] = 1
+                y_np = y[0][0].detach().cpu().numpy()
+                y_hat_np = y_hat[0].detach().cpu().numpy()
+                plot(y_np, y_hat_np, name=f"cloud-{idx}")
+
+                # Plotting/prediction cleanup
+                del y_hat, y_np, y_hat_np
+
+        # Iteration cleanup
         del X, y
 
 
