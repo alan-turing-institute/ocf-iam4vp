@@ -170,8 +170,9 @@ def train(
                 optimizer.step()
 
                 # Update best model so-far if appropriate
-                if loss.item() < best_loss:
-                    best_loss = loss.item()
+                current_loss = loss.item()
+                if current_loss < best_loss:
+                    best_loss = current_loss
                     pathlib.Path.unlink(best_candidate_path, missing_ok=True)
                     torch.save(model.state_dict(), best_candidate_path)
 
@@ -182,7 +183,7 @@ def train(
                 del loss
 
         print(
-            f"Epoch [{epoch}/{num_epochs}], Loss: {loss.item():.4f}, Best loss {best_loss:.4f}"
+            f"Epoch [{epoch}/{num_epochs}], Loss: {current_loss:.4f}, Best loss {best_loss:.4f}"
         )
         pathlib.Path.unlink(best_model_path, missing_ok=True)
         shutil.move(best_candidate_path, best_model_path)
