@@ -13,7 +13,7 @@ model:
 validation:
   data_path: "/bask/projects/v/vjgo8416-climate/shared/data/eumetsat/testing2022/2022_test_nonhrv.zarr"
   wandb_project_name: "cloudcasting"
-  wandb_run_name: "IAM4VP-validation"
+  wandb_run_name: "IAM4VP-0.1.2-epochs1"
   nan_to_num: False
   batch_size: 2
   num_workers: 0
