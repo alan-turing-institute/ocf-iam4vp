@@ -137,13 +137,9 @@ def train(
         # Set model to training mode
         model.train()
 
-        # Set checkpoint paths
+        # Set checkpoint path
         best_candidate_path = (
             output_directory / f"best-current-model-epoch-{epoch}.state-dict.pt"
-        )
-        best_model_path = (
-            output_directory
-            / f"best-model-epoch-{epoch}-loss-{best_loss:.3g}.state-dict.pt"
         )
 
         for batch_X, batch_y in tqdm.tqdm(train_dataloader):
@@ -184,6 +180,10 @@ def train(
 
         print(
             f"Epoch [{epoch}/{num_epochs}], Loss: {current_loss:.4f}, Best loss {best_loss:.4f}"
+        )
+        best_model_path = (
+            output_directory
+            / f"best-model-epoch-{epoch}-loss-{best_loss:.3g}.state-dict.pt"
         )
         pathlib.Path.unlink(best_model_path, missing_ok=True)
         shutil.move(best_candidate_path, best_model_path)
