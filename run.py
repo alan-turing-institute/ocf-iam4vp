@@ -120,7 +120,7 @@ def train(
     optimizer = optim.Adam(model.parameters(), lr=0.0001)
 
     # Training loop
-    for epoch in range(1, num_epochs + 1):
+    for epoch in range(num_epochs + 1):
         # Load existing model if there is one
         with suppress(StopIteration):
             existing_state_dict = next(
@@ -131,6 +131,10 @@ def train(
                 torch.load(existing_state_dict, map_location=device, weights_only=True)
             )
             print(f"Skipping epoch {epoch} after loading weights from existing model")
+            continue
+
+        # Do not run epoch 0 - it's just for preloading a model
+        if epoch < 1:
             continue
 
         # Set model to training mode
