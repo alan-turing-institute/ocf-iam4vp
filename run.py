@@ -115,12 +115,11 @@ def train(
     )
     model = model.to(device)
 
-    # Loss function and optimizer
-    criterion = torch.nn.MSELoss()
+    # Loss and optimizer
+    best_loss = 999
     optimizer = optim.Adam(model.parameters(), lr=0.0001)
 
     # Training loop
-    best_loss = 999
     for epoch in range(1, num_epochs + 1):
         # Load existing model if there is one
         with suppress(StopIteration):
@@ -159,7 +158,11 @@ def train(
                 y_hat = model(batch_X, y_hats, times)
 
                 # Calculate the loss
-                loss = criterion(y_hat, batch_y[:, f_step, :, :, :])
+                y = batch_y[:, f_step, :, :, :]
+                y[y == -1] == torch.nan  # mask missing data in the target
+                loss = torch.nanmean(
+                    torch.nn.functional.mse_loss(y_hat, y, reduction="none")
+                )
 
                 # Backward pass and optimize
                 loss.backward()
