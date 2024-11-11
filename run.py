@@ -161,7 +161,7 @@ def train(
                 y = batch_y[:, f_step, :, :, :]
                 y[y == -1] == torch.nan  # mask missing data in the target
                 loss = torch.nanmean(
-                    torch.nn.functional.mse_loss(y_hat, y, reduction="none")
+                    torch.nn.functional.l1_loss(y_hat, y, reduction="none")
                 )
 
                 # Backward pass and optimize
