@@ -230,6 +230,7 @@ class IAM4VP(nn.Module):
         )
         self.lp = LearnedPrior(C, hid_S, N_S)
         self.str = SpatioTemporalRefinement(C, T)
+        self.norm = torch.nn.Sigmoid()
 
     def forward(
         self,
@@ -278,8 +279,12 @@ class IAM4VP(nn.Module):
         # Decode the output
         Y = self.dec(hid, skip)
 
-        # Perform STR and return
-        return self.str(Y)
+        # Perform spatio-temporal refinement
+        Y = self.str(Y)
+
+        # Apply a sigmoid to restrict output to range (0, 1)
+        Y = self.norm(Y)
+        return Y
 
     def predict(
         self,
