@@ -48,39 +48,6 @@ class Encoder(nn.Module):
         return latent, enc1
 
 
-class LearnedPrior(nn.Module):
-    """
-    LearnedPrior
-
-    Transform priors from the full phase space into a reduced latent space
-    """
-
-    def __init__(self, C_in: int, C_hid: int, N_S: int) -> None:
-        super().__init__()
-        strides = stride_generator(N_S)
-        self.enc = nn.Sequential(
-            ConvSC(C_in, C_hid, stride=strides[0]),
-            *[ConvSC(C_hid, C_hid, stride=s) for s in strides[1:]],
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Transformation summary
-
-        Inputs:
-            x: (batch_size, channels, height, width)
-
-        Outputs:
-            latent: (batch_size, hidden_spatial, height_latent, width_latent)
-            enc1: (batch_size, hidden_spatial, height, width)
-        """
-        enc1 = self.enc[0](x)
-        latent = enc1
-        for i in range(1, len(self.enc)):
-            latent = self.enc[i](latent)
-        return latent, enc1
-
-
 class Decoder(nn.Module):
     """
     Decoder
@@ -230,10 +197,9 @@ class IAM4VP(nn.Module):
         self.enc = Encoder(C, hid_S, N_S)
         self.hid = Predictor(T, hid_S, hid_T, N_T)
         self.dec = Decoder(hid_S, C, N_S)
-        self.mask_token = nn.Parameter(
+        self.future_latent = nn.Parameter(
             torch.zeros_like(self.enc(torch.randn(shape_in))[0])
         )
-        self.lp = LearnedPrior(C, hid_S, N_S)
         self.str = SpatioTemporalRefinement(C, T)
         self.norm = torch.nn.Sigmoid()
 
@@ -301,20 +267,19 @@ class IAM4VP(nn.Module):
         B, T, C, H, W = x_raw.shape
         x = x_raw.contiguous().view(B * T, C, H, W)
 
-        # Encode to latent space
+        # Encode input to latent space
         embed, skip = self.enc(x)
         _, C_, H_, W_ = embed.shape
 
-        # Embed future frames via learned prior
-        mask_token = self.mask_token.repeat(B, 1, 1, 1, 1)
+        # Encode future frames to latent space, padding with zeros
+        future_latent = self.future_latent.repeat(B, 1, 1, 1, 1)
         for idx, pred in enumerate(y_raw):
-            embed_priors, _ = self.lp(pred)
-            mask_token[:, idx, :, :, :] = embed_priors
+            pred_embed, _ = self.enc(pred)
+            future_latent[:, idx, :, :, :] = pred_embed
 
         # Combine data and priors in latent space
-        x_latent = embed.view(B, T, C_, H_, W_)
-        priors_latent = mask_token
-        combined_latent = torch.cat([x_latent, priors_latent], dim=1)
+        context_latent = embed.view(B, T, C_, H_, W_)
+        combined_latent = torch.cat([context_latent, future_latent], dim=1)
 
         # Construct time embedding
         times = torch.tensor(100).repeat(B).to(x.device) if t_raw is None else t_raw
