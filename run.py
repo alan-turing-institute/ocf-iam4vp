@@ -159,14 +159,14 @@ def train(
 
         for batch_X, batch_y in tqdm.tqdm(train_dataloader):
             # Send batch tensors to the current device
-            batch_X = batch_X.to(device)
-            batch_y = batch_y.to(device)
+            batch_X: torch.Tensor = batch_X.to(device)
+            batch_y: torch.Tensor = batch_y.to(device)
 
             # Zero the parameter gradients
             optimizer.zero_grad()
 
             # Forward pass for the all forecast time steps
-            y_hats = model(batch_X)
+            y_hats: torch.Tensor = model(batch_X)
 
             # Calculate the loss
             batch_y[batch_y == -1] == torch.nan  # mask missing data in the target
