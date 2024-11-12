@@ -115,6 +115,15 @@ def train(
     )
     model = model.to(device)
 
+    # Log parameters
+    print("Training IAM4VP model")
+    print(f"... hidden_channels_space {hidden_channels_space}")
+    print(f"... hidden_channels_time {hidden_channels_time}")
+    print(f"... num_convolutions_space {num_convolutions_space}")
+    print(f"... num_convolutions_time {num_convolutions_time}")
+    print(f"... num_forecast_steps {num_forecast_steps}")
+    print(f"... num_history_steps {num_history_steps}")
+
     # Loss and optimizer
     best_loss = 999
     optimizer = optim.Adam(model.parameters(), lr=0.0001)
@@ -222,6 +231,15 @@ def validate(
     )
     model = model.to(device)
     model.eval()
+
+    # Log parameters
+    print("Validating IAM4VP model")
+    print(f"... hidden_channels_space {hidden_channels_space}")
+    print(f"... hidden_channels_time {hidden_channels_time}")
+    print(f"... num_convolutions_space {num_convolutions_space}")
+    print(f"... num_convolutions_time {num_convolutions_time}")
+    print(f"... num_forecast_steps {NUM_FORECAST_STEPS}")
+    print(f"... num_history_steps {num_history_steps}")
 
     # Set up the validation dataset
     valid_dataset = ValidationSatelliteDataset(
