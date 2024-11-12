@@ -123,6 +123,7 @@ def train(
     print(f"... num_convolutions_time {num_convolutions_time}")
     print(f"... num_forecast_steps {num_forecast_steps}")
     print(f"... num_history_steps {num_history_steps}")
+    print(f"... output_directory {output_directory}")
 
     # Loss and optimizer
     best_loss = 999
@@ -240,6 +241,7 @@ def validate(
     print(f"... num_convolutions_time {num_convolutions_time}")
     print(f"... num_forecast_steps {NUM_FORECAST_STEPS}")
     print(f"... num_history_steps {num_history_steps}")
+    print(f"... output_directory {output_directory}")
 
     # Set up the validation dataset
     valid_dataset = ValidationSatelliteDataset(
