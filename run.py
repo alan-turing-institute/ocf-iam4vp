@@ -294,8 +294,13 @@ def validate(
         plt.close()
 
     for idx, (X, y) in enumerate(tqdm.tqdm(valid_dataloader)):
+        # Ensure that the ground truth has at least one timestep
+        num_forecast_steps = y.shape[2]
+        if num_forecast_steps < 1:
+            continue
+
         if idx % 100 == 0:
-            y_hats = model.predict(X, y.shape[2], device)
+            y_hats = model.predict(X, num_forecast_steps, device)
 
             # Plot channels for timestep 1
             y_t1 = y[0, :, 0, :, :]
