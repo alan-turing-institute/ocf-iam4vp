@@ -54,6 +54,7 @@ class IAM4VPCloudcaster(AbstractModel):
         # Load the pretrained model
         self.model = IAM4VP(
             (num_history_steps, NUM_CHANNELS, IMAGE_SIZE_TUPLE[0], IMAGE_SIZE_TUPLE[1]),
+            num_forecast_steps=NUM_FORECAST_STEPS,
             hid_S=hidden_channels_space,
             hid_T=hidden_channels_time,
             N_S=num_convolutions_space,
@@ -71,7 +72,7 @@ class IAM4VPCloudcaster(AbstractModel):
         # This is where you will make predictions with your model
         # The input X is a numpy array with shape (batch_size, channels, time, height, width)
         # The output y_hat is a numpy array with shape (batch_size, channels, time, height, width)
-        return self.model.predict(X, NUM_FORECAST_STEPS, self.device)
+        return self.model.predict(X, self.device)
 
     def hyperparameters_dict(self) -> dict[str, str]:
         """

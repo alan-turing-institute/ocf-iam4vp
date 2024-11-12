@@ -42,6 +42,7 @@ def summarise(
     # Create the model
     model = IAM4VP(
         (num_history_steps, NUM_CHANNELS, IMAGE_SIZE_TUPLE[0], IMAGE_SIZE_TUPLE[1]),
+        num_forecast_steps=num_forecast_steps,
         hid_S=hidden_channels_space,
         hid_T=hidden_channels_time,
         N_S=num_convolutions_space,
@@ -108,6 +109,7 @@ def train(
     # Create the model
     model = IAM4VP(
         (num_history_steps, NUM_CHANNELS, IMAGE_SIZE_TUPLE[0], IMAGE_SIZE_TUPLE[1]),
+        num_forecast_steps=num_forecast_steps,
         hid_S=hidden_channels_space,
         hid_T=hidden_channels_time,
         N_S=num_convolutions_space,
@@ -157,43 +159,34 @@ def train(
 
         for batch_X, batch_y in tqdm.tqdm(train_dataloader):
             # Send batch tensors to the current device
-            batch_X = batch_X.swapaxes(1, 2).to(device)
-            batch_y = batch_y.swapaxes(1, 2).to(device)
+            batch_X = batch_X.to(device)
+            batch_y = batch_y.to(device)
 
-            y_hats = []
-            for f_step in range(num_forecast_steps):
-                # Zero the parameter gradients
-                optimizer.zero_grad()
+            # Zero the parameter gradients
+            optimizer.zero_grad()
 
-                # Generate an appropriately-sized set of blank times
-                times = torch.tensor(f_step * 100).repeat(batch_X.shape[0]).to(device)
+            # Forward pass for the all forecast time steps
+            y_hats = model(batch_X)
 
-                # Forward pass for the next time step
-                y_hat = model(batch_X, y_hats, times)
+            # Calculate the loss
+            batch_y[batch_y == -1] == torch.nan  # mask missing data in the target
+            loss = torch.nanmean(
+                torch.nn.functional.l1_loss(y_hats, batch_y, reduction="none")
+            )
 
-                # Calculate the loss
-                y = batch_y[:, f_step, :, :, :]
-                y[y == -1] == torch.nan  # mask missing data in the target
-                loss = torch.nanmean(
-                    torch.nn.functional.l1_loss(y_hat, y, reduction="none")
-                )
+            # Backward pass and optimize
+            loss.backward()
+            optimizer.step()
 
-                # Backward pass and optimize
-                loss.backward()
-                optimizer.step()
+            # Update best model so-far if appropriate
+            current_loss = loss.item()
+            if current_loss < best_loss:
+                best_loss = current_loss
+                pathlib.Path.unlink(best_candidate_path, missing_ok=True)
+                torch.save(model.state_dict(), best_candidate_path)
 
-                # Update best model so-far if appropriate
-                current_loss = loss.item()
-                if current_loss < best_loss:
-                    best_loss = current_loss
-                    pathlib.Path.unlink(best_candidate_path, missing_ok=True)
-                    torch.save(model.state_dict(), best_candidate_path)
-
-                # Append latest prediction to queue
-                y_hats.append(y_hat.detach())
-
-                # Free up memory
-                del loss
+            # Free up memory
+            del loss, batch_X, batch_y, y_hats
 
         print(
             f"Epoch [{epoch}/{num_epochs}], Loss: {current_loss:.4f}, Best loss {best_loss:.4f}"
@@ -222,6 +215,7 @@ def validate(
     # Create the model
     model = IAM4VP(
         (num_history_steps, NUM_CHANNELS, IMAGE_SIZE_TUPLE[0], IMAGE_SIZE_TUPLE[1]),
+        num_forecast_steps=NUM_FORECAST_STEPS,
         hid_S=hidden_channels_space,
         hid_T=hidden_channels_time,
         N_S=num_convolutions_space,
@@ -315,12 +309,11 @@ def validate(
 
     for idx, (X, y) in enumerate(tqdm.tqdm(valid_dataloader)):
         # Ensure that the ground truth has at least one timestep
-        num_forecast_steps = y.shape[2]
-        if num_forecast_steps < 1:
+        if y.shape[2] < 1:
             continue
 
         if idx % 100 == 0:
-            y_hats = model.predict(X, num_forecast_steps, device)
+            y_hats = model.predict(X, device)
 
             # Plot channels for timestep 1
             y_t1 = y[0, :, 0, :, :]

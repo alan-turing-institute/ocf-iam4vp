@@ -204,16 +204,20 @@ class IAM4VP(nn.Module):
     - Run spatio-temporal predictor
     - Spatial decoder to original phase space
     - Spatial temporal refinement (STR)
+    - Sigmoid normalisation to range (0, 1)
 
     Parameters:
-    - hid_S: number of spatial hidden channels
-    - N_S: number of spatial convolution layers
-    - N_T: number of temporal convolution layers
+    - num_forecast_steps [int]: number of steps to forecast
+    - hid_S [int]: number of spatial hidden channels
+    - hid_T [int]: number of temporal hidden channels
+    - N_S [int]: number of spatial convolution layers
+    - N_T [int]: number of temporal convolution layers
     """
 
     def __init__(
         self,
         shape_in: torch.Size,
+        num_forecast_steps: int = 12,
         hid_S: int = 64,
         hid_T: int = 512,
         N_S: int = 4,
@@ -221,6 +225,7 @@ class IAM4VP(nn.Module):
     ):
         super().__init__()
         T, C, H, W = shape_in
+        self.num_forecast_steps = num_forecast_steps
         self.time_mlp = TimeMLP(dim=hid_S)
         self.enc = Encoder(C, hid_S, N_S)
         self.hid = Predictor(T, hid_S, hid_T, N_T)
@@ -233,6 +238,49 @@ class IAM4VP(nn.Module):
         self.norm = torch.nn.Sigmoid()
 
     def forward(
+        self,
+        x_raw: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Transformation summary
+
+        Inputs:
+            x: (batch_size, channels, history_steps, height, width)
+
+        Outputs:
+            (batch_size, channels, forecast_steps, height, width)
+        """
+        # (B, C, T, H, W) -> (B, T, C, H, W)
+        batch_X = x_raw.swapaxes(1, 2)
+
+        # Generate the requested number of forecasts
+        y_hats: list[torch.Tensor] = []
+        for f_step in range(self.num_forecast_steps):
+            # Generate an appropriately-sized set of blank times
+            times = torch.tensor(f_step * 100).repeat(batch_X.shape[0]).to(batch_X.device)
+
+            # Forward pass for the next time step
+            # Note that each prediction has shape (batch_size, channels, height, width)
+            y_hats.append(self.forecast_one_timestep(batch_X, y_hats, times))
+
+            # Cleanup loop variables
+            del times
+
+        # Cleanup input
+        del batch_X
+
+        # Convert results to the expected output format by doing the following:
+        # - concatenate the forecasts along a new time axis
+        Y = torch.stack(y_hats, dim=2) # (B, C, T, H, W)
+
+        # Cleanup step-by-step predictions
+        for y_hat in y_hats:
+            del y_hat
+
+        return Y
+
+
+    def forecast_one_timestep(
         self,
         x_raw: torch.Tensor,
         y_raw: list[torch.Tensor] = [],
@@ -289,7 +337,6 @@ class IAM4VP(nn.Module):
     def predict(
         self,
         X: np.ndarray,
-        n_forecast_steps: int,
         device: str,
     ) -> torch.Tensor:
         """
@@ -297,52 +344,29 @@ class IAM4VP(nn.Module):
 
         Inputs:
             X [numpy array]: (batch_size, channels, time, height, width)
-            n_forecast_steps [int]: number of steps to forecast
             device [str]: Which PyTorch device to use
 
         Outputs:
-            y_hat [numpy array]: (batch_size, channels, n_forecast_steps, height, width)
+            y_hat [numpy array]: (batch_size, channels, num_forecast_steps, height, width)
         """
         # Disable gradient calculation in evaluate mode
         with torch.no_grad():
 
             # Load data into tensor with shape (batch_size, time, channels, height, width)
-            batch_X = torch.from_numpy(X).swapaxes(1, 2).to(device)
+            batch_X = torch.from_numpy(X).to(device)
 
             # Generate the requested number of forecasts
-            y_hats: list[torch.Tensor] = []
-            for f_step in range(n_forecast_steps):
-
-                # Generate an appropriately-sized set of blank times
-                times = torch.tensor(f_step * 100).repeat(batch_X.shape[0]).to(device)
-
-                # Forward pass for the next time step
-                y_hat: torch.Tensor = self(batch_X, y_hats, times)
-
-                # Store the prediction
-                # Note that y_hat has shape (batch_size, channels, height, width)
-                y_hats.append(y_hat.detach())
-
-                # Cleanup loop variables
-                del times
-
-            # Cleanup inputs
-            del batch_X
+            y_hats: torch.Tensor = self(batch_X)
 
             # Convert results to the expected output format by doing the following:
-            # - Add a time axis
-            # - convert from Tensor to numpy array
-            # - concatenate the forecasts along the time axis
             # - ensure data is in the range (0, 1)
             # - remove any NaNs
-            y_hat_np = [y_hat[:, :, None, :, :].cpu().numpy() for y_hat in y_hats]
-            y_hat_concat = np.concatenate(y_hat_np, axis=2)
-            y_hat_concat = y_hat_concat.clip(0, 1)
-            y_hat_concat = np.nan_to_num(y_hat_concat, nan=0, posinf=0)
+            y_hats_np = y_hats.cpu().detach().numpy()
+            y_hats_np = y_hats_np.clip(0, 1)
+            y_hats_np = np.nan_to_num(y_hats_np, nan=0, posinf=0)
 
-            # Cleanup predictions
-            for y_hat in y_hats:
-                del y_hat
+            # Cleanup tensor output
+            del y_hats
 
         # Return concatenated output
-        return y_hat_concat
+        return y_hats_np
