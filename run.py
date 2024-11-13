@@ -162,31 +162,46 @@ def train(
             batch_X: torch.Tensor = batch_X.to(device)
             batch_y: torch.Tensor = batch_y.to(device)
 
-            # Zero the parameter gradients
-            optimizer.zero_grad()
+            # Mask missing data in the target
+            batch_y[batch_y == -1] == torch.nan
 
-            # Forward pass for the all forecast time steps
-            y_hats: torch.Tensor = model(batch_X)
+            # Generate the requested number of forecasts
+            y_hats: list[torch.Tensor] = []
+            for idx_forecast in range(model.num_forecast_steps):
+                # Zero the parameter gradients
+                optimizer.zero_grad()
 
-            # Calculate the loss
-            batch_y[batch_y == -1] == torch.nan  # mask missing data in the target
-            loss = torch.nanmean(
-                torch.nn.functional.l1_loss(y_hats, batch_y, reduction="none")
-            )
+                # Generate an appropriately-sized set of blank times
+                times = torch.tensor(idx_forecast * 100).repeat(batch_X.shape[0]).to(batch_X.device)
 
-            # Backward pass and optimize
-            loss.backward()
-            optimizer.step()
+                # Forward pass for the next time step (batch_size, channels, height, width)
+                y_hat = model(batch_X, y_hats, times)
+                del times
 
-            # Update best model so-far if appropriate
-            current_loss = loss.item()
-            if current_loss < best_loss:
-                best_loss = current_loss
-                pathlib.Path.unlink(best_candidate_path, missing_ok=True)
-                torch.save(model.state_dict(), best_candidate_path)
+                # Calculate the loss
+                y = batch_y[:, :, idx_forecast, :, :]
+                loss = torch.nanmean(
+                    torch.nn.functional.l1_loss(y_hat, y, reduction="none")
+                )
+                del y
+
+                # Backward pass and optimize
+                loss.backward()
+                optimizer.step()
+
+                # Append latest prediction to queue
+                y_hats.append(y_hat.detach())
+
+                # Update best model so-far if appropriate
+                current_loss = loss.item()
+                if current_loss < best_loss:
+                    best_loss = current_loss
+                    pathlib.Path.unlink(best_candidate_path, missing_ok=True)
+                    torch.save(model.state_dict(), best_candidate_path)
+                del loss
 
             # Free up memory
-            del loss, batch_X, batch_y, y_hats
+            del batch_X, batch_y
 
         print(
             f"Epoch [{epoch}/{num_epochs}], Loss: {current_loss:.4f}, Best loss {best_loss:.4f}"

@@ -206,49 +206,6 @@ class IAM4VP(nn.Module):
     def forward(
         self,
         x_raw: torch.Tensor,
-    ) -> torch.Tensor:
-        """
-        Transformation summary
-
-        Inputs:
-            x: (batch_size, channels, history_steps, height, width)
-
-        Outputs:
-            (batch_size, channels, forecast_steps, height, width)
-        """
-        # (B, C, T, H, W) -> (B, T, C, H, W)
-        batch_X = x_raw.swapaxes(1, 2)
-
-        # Generate the requested number of forecasts
-        y_hats: list[torch.Tensor] = []
-        for f_step in range(self.num_forecast_steps):
-            # Generate an appropriately-sized set of blank times
-            times = torch.tensor(f_step * 100).repeat(batch_X.shape[0]).to(batch_X.device)
-
-            # Forward pass for the next time step
-            # Note that each prediction has shape (batch_size, channels, height, width)
-            y_hats.append(self.forecast_one_timestep(batch_X, y_hats, times))
-
-            # Cleanup loop variables
-            del times
-
-        # Cleanup input
-        del batch_X
-
-        # Convert results to the expected output format by doing the following:
-        # - concatenate the forecasts along a new time axis
-        Y = torch.stack(y_hats, dim=2) # (B, C, T, H, W)
-
-        # Cleanup step-by-step predictions
-        for y_hat in y_hats:
-            del y_hat
-
-        return Y
-
-
-    def forecast_one_timestep(
-        self,
-        x_raw: torch.Tensor,
         y_raw: list[torch.Tensor] = [],
         t_raw: torch.Tensor | None = None,
     ) -> torch.Tensor:
@@ -256,16 +213,16 @@ class IAM4VP(nn.Module):
         Transformation summary
 
         Inputs:
-            x: (batch_size, history_steps, channels, height, width)
+            x: (batch_size, channels, history_steps, height, width)
             y_raw: N * (batch_size, channels, height, width)
             t: (batch_size)
 
         Outputs:
             (batch_size, channels, height, width)
         """
-        # Combine batch and time information
-        B, T, C, H, W = x_raw.shape
-        x = x_raw.contiguous().view(B * T, C, H, W)
+        # Convert from (B, C, T, H, W) to (B * T, C, H, W)
+        B, C, T, H, W = x_raw.shape
+        x = x_raw.contiguous().swapaxes(1, 2).view(B * T, C, H, W)
 
         # Encode input to latent space
         embed, skip = self.enc(x)
@@ -327,17 +284,31 @@ class IAM4VP(nn.Module):
             batch_X = torch.from_numpy(np.nan_to_num(X, nan=0, posinf=0)).to(device)
 
             # Generate the requested number of forecasts
-            y_hats: torch.Tensor = self(batch_X)
+            y_hats: list[torch.Tensor] = []
+            for idx_forecast in range(self.num_forecast_steps):
+                # Generate an appropriately-sized set of blank times
+                times = torch.tensor(idx_forecast * 100).repeat(batch_X.shape[0]).to(batch_X.device)
 
-            # Convert results to the expected output format by doing the following:
-            # - ensure data is in the range (0, 1)
-            # - remove any NaNs
-            y_hats_np = y_hats.cpu().detach().numpy()
-            y_hats_np = y_hats_np.clip(0, 1)
-            y_hats_np = np.nan_to_num(y_hats_np, nan=0, posinf=0)
+                # Forward pass for the next time step
+                # Note that each prediction has shape (batch_size, channels, height, width)
+                y_hats.append(self.forward(batch_X, y_hats, times).detach())
+                del times
 
-            # Cleanup tensor output
+            # Free up memory
+            del batch_X
+
+            # Concatenate the forecasts along a new time axis
+            forecasts = torch.stack(y_hats, dim=2)  # (B, C, T, H, W)
             del y_hats
 
-        # Return concatenated output
-        return y_hats_np
+            # Convert results to the expected output format by doing the following:
+            # - concatenate the forecasts along a new time axis
+            # - ensure data is in the range (0, 1)
+            # - remove any NaNs
+            forecasts_np = forecasts.cpu().detach().numpy()
+            forecasts_np = forecasts_np.clip(0, 1)
+            forecasts_np = np.nan_to_num(forecasts_np, nan=0, posinf=0)
+            del forecasts
+
+        # Return numpy output with shape (B, C, T, H, W)
+        return forecasts_np
