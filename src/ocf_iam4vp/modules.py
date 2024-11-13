@@ -138,10 +138,10 @@ class BasicConv2d(nn.Module):
         Outputs:
             (batch_size * history_steps, channels_out, height, width)
         """
-        y = self.conv(x)
+        x = self.conv(x)
         if self.act_norm:
-            y = self.act(self.norm(y))
-        return y
+            x = self.act(self.norm(x))
+        return x
 
 
 class ConvSC(nn.Module):
@@ -210,9 +210,7 @@ class ConvNextBase(nn.Module):
             drop_path=drop_path,
         )
 
-    def forward(
-        self, x: torch.Tensor, time_emb: torch.Tensor | None = None
-    ) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Transformation summary
 
@@ -270,11 +268,11 @@ class ConvNextTimeEmbedLKA(nn.Module):
         Outputs:
             (batch_size, hidden_spatial * history_steps, height_latent, width_latent)
         """
-        input = x
+        x_initial = x
         time_emb = self.mlp(time_emb)
         x = self.lka(x) + rearrange(time_emb, "b c -> b c 1 1")
         x = self.cnb(x)
-        x = input + self.drop_path(x)
+        x = x_initial + self.drop_path(x)
         return x
 
 
@@ -315,11 +313,11 @@ class ConvNextTimeEmbed(nn.Module):
         Outputs:
             (batch_size, hidden_spatial * history_steps, height_latent, width_latent)
         """
-        input = x
+        x_initial = x
         time_emb = self.mlp(time_emb)
         x = self.dwconv(x) + rearrange(time_emb, "b c -> b c 1 1")
         x = self.cnb(x)
-        x = input + self.drop_path(x)
+        x = x_initial + self.drop_path(x)
         return x
 
 
@@ -344,11 +342,11 @@ class LargeKernelAttention(nn.Module):
         Outputs:
             (batch_size, channel_dim, height_dim, width_dim)
         """
-        u = x.clone()
+        x_initial = x.clone()
         attn = self.conv0(x)
         attn = self.conv_spatial(attn)
         attn = self.conv1(attn)
-        return u * attn
+        return x_initial * attn
 
 
 class Attention(nn.Module):
@@ -372,10 +370,10 @@ class Attention(nn.Module):
         Outputs:
             (batch_size, channels * history_steps, height, width)
         """
-        initial_input = x.clone()
+        x_initial = x.clone()
         x = self.proj_1(x)
         x = self.activation(x)
         x = self.spatial_gating_unit(x)
         x = self.proj_2(x)
-        x = x + initial_input
+        x = x + x_initial
         return x
