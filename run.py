@@ -193,14 +193,14 @@ def train(
                 current_loss = loss.item()
                 del loss
 
+            # Free up memory
+            del batch_X, batch_y, y_hats
+
             # Update best model so-far if appropriate
             if current_loss < best_loss:
                 best_loss = current_loss
                 pathlib.Path.unlink(best_candidate_path, missing_ok=True)
                 torch.save(model.state_dict(), best_candidate_path)
-
-            # Free up memory
-            del batch_X, batch_y
 
         print(
             f"Epoch [{epoch}/{num_epochs}], Loss: {current_loss:.4f}, Best loss {best_loss:.4f}"
