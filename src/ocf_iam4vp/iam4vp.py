@@ -219,7 +219,7 @@ class IAM4VP(nn.Module):
         """
         # Convert from (B, C, T, H, W) to (B * T, C, H, W)
         B, C, T, H, W = x_raw.shape
-        x = x_raw.contiguous().swapaxes(1, 2).view(B * T, C, H, W)
+        x = x_raw.swapaxes(1, 2).contiguous().view(B * T, C, H, W)
 
         # Encode input to latent space
         embed, skip = self.enc(x)
