@@ -87,7 +87,7 @@ def train(
     # Load the training dataset
     dataset = SatelliteDataset(
         zarr_path=training_data_path,
-        start_time="2022-01-31",
+        start_time=None,
         end_time=None,
         history_mins=(num_history_steps - 1) * DATA_INTERVAL_SPACING_MINUTES,
         forecast_mins=num_forecast_steps * DATA_INTERVAL_SPACING_MINUTES,
