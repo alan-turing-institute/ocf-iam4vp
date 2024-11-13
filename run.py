@@ -189,13 +189,15 @@ def train(
                 # Append latest prediction to queue
                 y_hats.append(y_hat.detach())
 
-                # Update best model so-far if appropriate
+                # Keep track of current loss
                 current_loss = loss.item()
-                if current_loss < best_loss:
-                    best_loss = current_loss
-                    pathlib.Path.unlink(best_candidate_path, missing_ok=True)
-                    torch.save(model.state_dict(), best_candidate_path)
                 del loss
+
+            # Update best model so-far if appropriate
+            if current_loss < best_loss:
+                best_loss = current_loss
+                pathlib.Path.unlink(best_candidate_path, missing_ok=True)
+                torch.save(model.state_dict(), best_candidate_path)
 
             # Free up memory
             del batch_X, batch_y
