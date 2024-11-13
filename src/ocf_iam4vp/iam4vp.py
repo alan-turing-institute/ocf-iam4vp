@@ -280,17 +280,19 @@ class IAM4VP(nn.Module):
         # Combine data and priors in latent space
         context_latent = embed.view(B, T, C_, H_, W_)
         combined_latent = torch.cat([context_latent, future_latent], dim=1)
+        del context_latent, future_latent
 
         # Construct time embedding
         times = torch.tensor(100).repeat(B).to(x.device) if t_raw is None else t_raw
         time_emb = self.time_mlp(times)
 
         # Run predictor on combined latent data + time embedding
-        hid = self.hid(combined_latent, time_emb)
-        hid = hid.reshape(B * T, C_, H_, W_)
+        Y = self.hid(combined_latent, time_emb)
+        Y = Y.reshape(B * T, C_, H_, W_)
+        del combined_latent, time_emb
 
         # Decode the output
-        Y = self.dec(hid, skip)
+        Y = self.dec(Y, skip)
 
         # Perform spatio-temporal refinement
         Y = self.str(Y)
