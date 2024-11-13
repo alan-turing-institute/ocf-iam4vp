@@ -159,6 +159,7 @@ def train(
 
         for batch_X, batch_y in tqdm.tqdm(train_dataloader):
             # Send batch tensors to the current device
+            # Both tensors have shape (B, C, T, H, W)
             batch_X: torch.Tensor = batch_X.to(device)
             batch_y: torch.Tensor = batch_y.to(device)
 
@@ -171,12 +172,8 @@ def train(
                 # Zero the parameter gradients
                 optimizer.zero_grad()
 
-                # Generate an appropriately-sized set of blank times
-                times = torch.tensor(idx_forecast * 100).repeat(batch_X.shape[0]).to(batch_X.device)
-
                 # Forward pass for the next time step (batch_size, channels, height, width)
-                y_hat = model(batch_X, y_hats, times)
-                del times
+                y_hat = model(batch_X, y_hats)
 
                 # Calculate the loss
                 y = batch_y[:, :, idx_forecast, :, :]

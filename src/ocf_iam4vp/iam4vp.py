@@ -207,7 +207,6 @@ class IAM4VP(nn.Module):
         self,
         x_raw: torch.Tensor,
         y_raw: list[torch.Tensor] = [],
-        t_raw: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """
         Transformation summary
@@ -215,7 +214,6 @@ class IAM4VP(nn.Module):
         Inputs:
             x: (batch_size, channels, history_steps, height, width)
             y_raw: N * (batch_size, channels, height, width)
-            t: (batch_size)
 
         Outputs:
             (batch_size, channels, height, width)
@@ -240,10 +238,8 @@ class IAM4VP(nn.Module):
         combined_latent = torch.cat([context_latent, future_latent], dim=1)
         del context_latent, future_latent, embed
 
-        # Construct time embedding
-        times = torch.tensor(100).repeat(B).to(x.device) if t_raw is None else t_raw
-        time_emb = self.time_mlp(times)
-        del times
+        # Construct time embedding from a uniformly-filled tensor
+        time_emb = self.time_mlp(torch.tensor(100 * len(y_raw)).repeat(B).to(x.device))
 
         # Run predictor on combined latent data + time embedding
         Y = self.hid(combined_latent, time_emb)
@@ -285,14 +281,10 @@ class IAM4VP(nn.Module):
 
             # Generate the requested number of forecasts
             y_hats: list[torch.Tensor] = []
-            for idx_forecast in range(self.num_forecast_steps):
-                # Generate an appropriately-sized set of blank times
-                times = torch.tensor(idx_forecast * 100).repeat(batch_X.shape[0]).to(batch_X.device)
-
+            for _ in range(self.num_forecast_steps):
                 # Forward pass for the next time step
                 # Note that each prediction has shape (batch_size, channels, height, width)
-                y_hats.append(self.forward(batch_X, y_hats, times).detach())
-                del times
+                y_hats.append(self.forward(batch_X, y_hats).detach())
 
             # Free up memory
             del batch_X
