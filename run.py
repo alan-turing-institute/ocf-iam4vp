@@ -327,22 +327,24 @@ def validate(
             continue
 
         if idx % 100 == 0:
-            y_hats = model.predict(X, device)
+            y_hats = model.predict(torch.from_numpy(X).to(device))
+            y_hats_np = y_hats.cpu().detach().numpy()
+            del y_hats
 
             # Plot channels for timestep 1
             y_t1 = y[0, :, 0, :, :]
-            y_hat_t1 = y_hats[0, :, 0, :, :]
+            y_hat_t1 = y_hats_np[0, :, 0, :, :]
             plot_channels(y_t1, y_hat_t1, name=f"cloud-channels-t1-{idx}")
             del y_t1, y_hat_t1
 
             # Plot video for channel 6
             y_c6 = y[0, 5, :, :, :]
-            y_hat_c6 = y_hats[0, 5, :, :, :]
+            y_hat_c6 = y_hats_np[0, 5, :, :, :]
             plot_times(y_c6, y_hat_c6, name=f"cloud-times-c6-{idx}")
             del y_c6, y_hat_c6
 
             # Plotting/prediction cleanup
-            del y_hats
+            del y_hats_np
 
         # Iteration cleanup
         del X, y

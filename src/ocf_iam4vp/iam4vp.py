@@ -1,6 +1,5 @@
 """Implementation of IAM4VP from https://github.com/seominseok0429/Implicit-Stacked-Autoregressive-Model-for-Video-Prediction"""
 
-import numpy as np
 import torch
 from torch import nn
 
@@ -259,25 +258,23 @@ class IAM4VP(nn.Module):
 
     def predict(
         self,
-        X: np.ndarray,
-        device: str,
+        X: torch.Tensor,
     ) -> torch.Tensor:
         """
         Make predictions with a trained model
 
         Inputs:
-            X [numpy array]: (batch_size, channels, time, height, width)
-            device [str]: Which PyTorch device to use
+            X [torch.Tensor]: (batch_size, channels, time, height, width)
 
         Outputs:
-            y_hat [numpy array]: (batch_size, channels, num_forecast_steps, height, width)
+            y_hat [torch.Tensor]: (batch_size, channels, num_forecast_steps, height, width)
         """
         # Disable gradient calculation in evaluate mode
         with torch.no_grad():
 
             # Load data into tensor with shape (batch_size, time, channels, height, width)
             # Explicitly remove NaNs from input
-            batch_X = torch.from_numpy(np.nan_to_num(X, nan=0, posinf=0)).to(device)
+            batch_X = torch.nan_to_num(X, nan=0, posinf=0, neginf=0)
 
             # Generate the requested number of forecasts
             # This gives a list of N tensors with shape (B, C, H, W)
@@ -290,17 +287,14 @@ class IAM4VP(nn.Module):
             # Free up memory
             del batch_X
 
-            # Concatenate the forecasts along a new time axis: (B, C, T, H, W)
-            forecasts = torch.stack(y_hats, dim=2)
-            del y_hats
-
             # Convert results to the expected output format by doing the following:
+            # - concatenate the forecasts along a new time axis
             # - ensure forecasts are in the range (0, 1)
             # - replace any NaNs or infinities with 0
-            forecasts_np = forecasts.cpu().detach().numpy()
-            forecasts_np = forecasts_np.clip(0, 1)
-            forecasts_np = np.nan_to_num(forecasts_np, nan=0, posinf=0)
-            del forecasts
+            forecasts = torch.stack(y_hats, dim=2)
+            forecasts = torch.clamp(forecasts, min=0, max=1)
+            forecasts = torch.nan_to_num(forecasts, nan=0, posinf=0, neginf=0)
+            del y_hats
 
-        # Return numpy output with shape (B, C, T, H, W)
-        return forecasts_np
+        # Return tensor with shape (B, C, T, H, W)
+        return forecasts
