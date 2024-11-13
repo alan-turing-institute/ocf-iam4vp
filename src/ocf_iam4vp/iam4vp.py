@@ -320,7 +320,8 @@ class IAM4VP(nn.Module):
         with torch.no_grad():
 
             # Load data into tensor with shape (batch_size, time, channels, height, width)
-            batch_X = torch.from_numpy(X).to(device)
+            # Explicitly remove NaNs from input
+            batch_X = torch.from_numpy(np.nan_to_num(X, nan=0, posinf=0)).to(device)
 
             # Generate the requested number of forecasts
             y_hats: torch.Tensor = self(batch_X)
