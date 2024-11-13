@@ -72,7 +72,7 @@ class IAM4VPCloudcaster(AbstractModel):
         # This is where you will make predictions with your model
         # The input X is a numpy array with shape (batch_size, channels, time, height, width)
         # The output y_hat is a numpy array with shape (batch_size, channels, time, height, width)
-        return self.model.predict(X, self.device)
+        return self.model.predict(torch.from_numpy(X).to(self.device))
 
     def hyperparameters_dict(self) -> dict[str, str]:
         """
