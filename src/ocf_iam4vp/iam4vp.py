@@ -280,23 +280,23 @@ class IAM4VP(nn.Module):
             batch_X = torch.from_numpy(np.nan_to_num(X, nan=0, posinf=0)).to(device)
 
             # Generate the requested number of forecasts
+            # This gives a list of N tensors with shape (B, C, H, W)
             y_hats: list[torch.Tensor] = []
             for _ in range(self.num_forecast_steps):
                 # Forward pass for the next time step
-                # Note that each prediction has shape (batch_size, channels, height, width)
+                # We append each prediction to the list of future frames
                 y_hats.append(self.forward(batch_X, y_hats).detach())
 
             # Free up memory
             del batch_X
 
-            # Concatenate the forecasts along a new time axis
-            forecasts = torch.stack(y_hats, dim=2)  # (B, C, T, H, W)
+            # Concatenate the forecasts along a new time axis: (B, C, T, H, W)
+            forecasts = torch.stack(y_hats, dim=2)
             del y_hats
 
             # Convert results to the expected output format by doing the following:
-            # - concatenate the forecasts along a new time axis
-            # - ensure data is in the range (0, 1)
-            # - remove any NaNs
+            # - ensure forecasts are in the range (0, 1)
+            # - replace any NaNs or infinities with 0
             forecasts_np = forecasts.cpu().detach().numpy()
             forecasts_np = forecasts_np.clip(0, 1)
             forecasts_np = np.nan_to_num(forecasts_np, nan=0, posinf=0)
