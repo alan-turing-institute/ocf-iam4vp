@@ -134,6 +134,7 @@ class MetricsCallback(L.Callback):
         # The first test run will be done before training
         if "train_loss" not in metrics:
             tqdm.write(f"Initial (untrained) testing loss: {metrics['test_loss']:.4f}")
+            self.best_test_loss = metrics["test_loss"]
             return
 
         tqdm.write(
