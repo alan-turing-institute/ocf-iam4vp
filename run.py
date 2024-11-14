@@ -93,13 +93,11 @@ def train(
         nan_to_num=True,
     )
     print(f"Loaded {len(dataset)} sequences of cloud coverage data.")
-    train_length = int(0.8 * len(dataset))
-    test_length = len(dataset) - train_length
-    train_dataset, test_dataset = torch.utils.data.random_split(
-        dataset, (train_length, test_length)
-    )
-    print(f"  {len(train_dataset)} will be used for training.")
-    print(f"  {len(test_dataset)} will be used for testing")
+    train_dataset, test_dataset = torch.utils.data.random_split(dataset, (0.8, 0.2))
+    train_length = max_batches if max_batches > 0 else len(train_dataset)
+    test_length = int(0.2 * max_batches) if max_batches > 0 else len(test_dataset)
+    print(f"  {train_length} will be used for training.")
+    print(f"  {test_length} will be used for testing")
 
     # Construct appropriate data loaders
     train_dataloader = DataLoader(
@@ -147,8 +145,8 @@ def train(
     metrics_callback = MetricsCallback()
     kwargs = (
         {
-            "limit_train_batches": max_batches,
-            "limit_val_batches": int(0.2 * max_batches),
+            "limit_train_batches": train_length,
+            "limit_val_batches": test_length,
         }
         if max_batches > 0
         else {}
@@ -206,6 +204,8 @@ def validate(
         zarr_path=validation_data_path,
     )
     print(f"Loaded {len(valid_dataset)} sequences of cloud coverage data.")
+    valid_length = max_batches if max_batches > 0 else len(valid_dataset)
+    print(f"  {valid_length} will be used for validation.")
 
     valid_dataloader = DataLoader(
         batch_size=batch_size,
@@ -220,7 +220,7 @@ def validate(
     plotting_callback = PlottingCallback(
         every_n_batches=3, output_directory=output_directory
     )
-    kwargs = {"limit_predict_batches": max_batches} if max_batches > 0 else {}
+    kwargs = {"limit_predict_batches": valid_length} if max_batches > 0 else {}
     predictor = L.Trainer(callbacks=[plotting_callback], logger=False, **kwargs)
     predictor.predict(model, valid_dataloader)
     print("Finished validating IAM4VP model")
