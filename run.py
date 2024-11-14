@@ -106,13 +106,13 @@ def train(
         batch_size=batch_size,
         dataset=train_dataset,
         num_workers=num_workers,
-        persistent_workers=True,
+        persistent_workers=(num_workers > 0),
     )
     test_dataloader = DataLoader(
         batch_size=batch_size,
         dataset=test_dataset,
         num_workers=num_workers,
-        persistent_workers=True,
+        persistent_workers=(num_workers > 0),
     )
 
     # Create the model
@@ -204,7 +204,7 @@ def validate(
         dataset=valid_dataset,
         drop_last=False,
         num_workers=num_workers,
-        persistent_workers=True,
+        persistent_workers=(num_workers > 0),
         shuffle=False,
     )
 
@@ -267,7 +267,7 @@ if __name__ == "__main__":
         "--num-history-steps", type=int, help="History steps", default=24
     )
     parser.add_argument(
-        "--num-workers", type=int, help="Number of workers to use", default=4
+        "--num-workers", type=int, help="Number of workers to use", default=0
     )
     parser.add_argument("--output-directory", type=str, help="Path to save outputs to")
     parser.add_argument("--validate-config-file", type=str, help="Validation config file")
