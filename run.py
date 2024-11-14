@@ -84,7 +84,7 @@ def train(
     training_data_path: str | list[str],
     num_workers: int = 0,
 ) -> None:
-    # Load the training dataset
+    # Load the training and test datasets
     dataset = SatelliteDataset(
         zarr_path=training_data_path,
         start_time=None,
@@ -94,12 +94,25 @@ def train(
         sample_freq_mins=DATA_INTERVAL_SPACING_MINUTES,
         nan_to_num=True,
     )
+    print(f"Loaded {len(dataset)} sequences of cloud coverage data.")
+    train_length=int(0.9 * len(dataset))
+    test_length=len(dataset) - train_length
+    train_dataset, test_dataset = torch.utils.data.random_split(dataset,(train_length,test_length))
+    print(f"  {len(train_dataset)} will be used for training.")
+    print(f"  {len(test_dataset)} will be used for testing")
 
-    # Construct a DataLoader
+    # Construct appropriate data loaders
     gen = torch.Generator()
     gen.manual_seed(0)
     train_dataloader = DataLoader(
-        dataset=dataset,
+        dataset=train_dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        worker_init_fn=seed_worker,
+        generator=gen,
+    )
+    test_dataloader = DataLoader(
+        dataset=test_dataset,
         batch_size=batch_size,
         num_workers=num_workers,
         worker_init_fn=seed_worker,
@@ -128,10 +141,10 @@ def train(
     print(f"... output_directory {output_directory}")
 
     # Loss and optimizer
-    best_loss = 999
+    best_test_loss = np.inf
     optimizer = optim.Adam(model.parameters(), lr=0.0001)
 
-    # Training loop
+    # Train for one epoch
     for epoch in range(num_epochs + 1):
         # Load existing model if there is one
         with suppress(StopIteration):
@@ -149,14 +162,9 @@ def train(
         if epoch < 1:
             continue
 
-        # Set model to training mode
+        # Training loop
         model.train()
-
-        # Set checkpoint path
-        best_candidate_path = (
-            output_directory / f"best-current-model-epoch-{epoch}.state-dict.pt"
-        )
-
+        train_losses = []
         for batch_X, batch_y in tqdm.tqdm(train_dataloader):
             # Send batch tensors to the current device
             # Both tensors have shape (B, C, T, H, W)
@@ -168,6 +176,7 @@ def train(
 
             # Generate the requested number of forecasts
             y_hats: list[torch.Tensor] = []
+            single_forecast_losses = []
             for idx_forecast in range(model.num_forecast_steps):
                 # Zero the parameter gradients
                 optimizer.zero_grad()
@@ -180,37 +189,54 @@ def train(
                 loss = torch.nanmean(
                     torch.nn.functional.l1_loss(y_hat, y, reduction="none")
                 )
+                single_forecast_losses.append(loss.item())
                 del y
 
                 # Backward pass and optimize
                 loss.backward()
                 optimizer.step()
+                del loss
 
                 # Append latest prediction to queue
                 y_hats.append(y_hat.detach())
 
-                # Keep track of current loss
-                current_loss = loss.item()
-                del loss
+            # Calculate loss for the full set of forecasts
+            train_losses.append(np.array(single_forecast_losses).mean())
 
             # Free up memory
             del batch_X, batch_y, y_hats
 
-            # Update best model so-far if appropriate
-            if current_loss < best_loss:
-                best_loss = current_loss
-                pathlib.Path.unlink(best_candidate_path, missing_ok=True)
-                torch.save(model.state_dict(), best_candidate_path)
+        # Test loop
+        model.eval()
+        test_losses = []
+        for batch_X, batch_y in tqdm.tqdm(test_dataloader):
+            # Generate a prediction
+            batch_y_hat = model.predict(batch_X.to(device))
 
+            # Calculate loss
+            batch_y = batch_y.to(device)
+            loss = torch.nanmean(
+                torch.nn.functional.l1_loss(batch_y_hat, batch_y, reduction="none")
+            )
+            test_losses.append(loss.item())
+
+        # Evaluate and save model if appropriate
+        train_loss = np.array(train_losses).mean()
+        test_loss = np.array(test_losses).mean()
         print(
-            f"Epoch [{epoch}/{num_epochs}], Loss: {current_loss:.4f}, Best loss {best_loss:.4f}"
+            f"Epoch [{epoch}/{num_epochs}], mean training loss: {train_loss:.4f}, mean testing loss {test_loss:.4f}"
         )
-        best_model_path = (
-            output_directory
-            / f"best-model-epoch-{epoch}-loss-{best_loss:.3g}.state-dict.pt"
-        )
-        pathlib.Path.unlink(best_model_path, missing_ok=True)
-        shutil.move(best_candidate_path, best_model_path)
+        if test_loss < best_test_loss:
+            print(f"... testing loss improved from {best_test_loss:.4f} to {test_loss:.4f}")
+            best_model_path = (
+                output_directory
+                / f"best-model-epoch-{epoch}-loss-{test_loss:.3g}.state-dict.pt"
+            )
+            pathlib.Path.unlink(best_model_path, missing_ok=True)
+            torch.save(model.state_dict(), best_model_path)
+            best_test_loss = test_loss
+        else:
+            print(f"... testing loss {test_loss:.4f} did not improve")
 
 
 def validate(

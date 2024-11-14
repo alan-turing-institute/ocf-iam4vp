@@ -297,4 +297,4 @@ class IAM4VP(nn.Module):
             del y_hats
 
         # Return tensor with shape (B, C, T, H, W)
-        return forecasts
+        return forecasts.to(X.device)
