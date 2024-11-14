@@ -1,9 +1,8 @@
 import argparse
 import pathlib
-import random
+import yaml
 
 import lightning as L
-import numpy as np
 import torch
 from cloudcasting.constants import (
     DATA_INTERVAL_SPACING_MINUTES,
@@ -12,24 +11,15 @@ from cloudcasting.constants import (
     NUM_FORECAST_STEPS,
 )
 from cloudcasting.dataset import SatelliteDataset, ValidationSatelliteDataset
-from cloudcasting.utils import numpy_validation_collate_fn
 from lightning.pytorch.callbacks import ModelCheckpoint
-from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 from torchinfo import summary
 
 from ocf_iam4vp import IAM4VP, IAM4VPLightning, MetricsCallback, PlottingCallback
 
 
-def seed_worker(worker_id):
-    worker_seed = torch.initial_seed() % 2**32
-    np.random.seed(worker_seed)
-    random.seed(worker_seed)
-
-
 def summarise(
     batch_size: int,
-    device: str,
     hidden_channels_space: int,
     hidden_channels_time: int,
     num_convolutions_space: int,
@@ -37,6 +27,13 @@ def summarise(
     num_forecast_steps: int,
     num_history_steps: int,
 ) -> None:
+    # Get the appropriate PyTorch device
+    device = (
+        "mps"
+        if torch.backends.mps.is_available()
+        else "cuda" if torch.cuda.is_available() else "cpu"
+    )
+
     # Create the model
     model = IAM4VP(
         (num_history_steps, NUM_CHANNELS, IMAGE_SIZE_TUPLE[0], IMAGE_SIZE_TUPLE[1]),
@@ -70,7 +67,7 @@ def summarise(
 
 def train(
     batch_size: int,
-    device: str,
+    dev_run: bool,
     hidden_channels_space: int,
     hidden_channels_time: int,
     num_convolutions_space: int,
@@ -106,14 +103,14 @@ def train(
 
     # Construct appropriate data loaders
     train_dataloader = DataLoader(
-        dataset=train_dataset,
         batch_size=batch_size,
+        dataset=train_dataset,
         num_workers=num_workers,
         persistent_workers=True,
     )
     test_dataloader = DataLoader(
-        dataset=test_dataset,
         batch_size=batch_size,
+        dataset=test_dataset,
         num_workers=num_workers,
         persistent_workers=True,
     )
@@ -127,7 +124,6 @@ def train(
         N_S=num_convolutions_space,
         N_T=num_convolutions_time,
     )
-    model = model.to(device)
 
     # Log parameters
     print("Training IAM4VP model")
@@ -143,31 +139,36 @@ def train(
     val_every_n_epochs = 1
     checkpoint_callback = ModelCheckpoint(
         dirpath=output_directory,
-        save_top_k=-1,
         every_n_epochs=val_every_n_epochs,
-        monitor="test_loss",
         filename="{epoch}-{test_loss:.2f}",
+        monitor="test_loss",
+        save_top_k=-1,
     )
     metrics_callback = MetricsCallback()
+    kwargs = {"limit_train_batches": 2, "limit_val_batches": 2} if dev_run else {}
     trainer = L.Trainer(
-        logger=False,
         callbacks=[checkpoint_callback, metrics_callback],
-        max_epochs=num_epochs,
         check_val_every_n_epoch=val_every_n_epochs,
+        logger=False,
+        max_epochs=num_epochs,
+        **kwargs,
     )
 
     # Perform training and validation
     trainer.fit(
-        model=model, train_dataloaders=train_dataloader, val_dataloaders=test_dataloader
+        model=model,
+        train_dataloaders=train_dataloader,
+        val_dataloaders=test_dataloader,
     )
 
 
 def validate(
     batch_size: int,
-    output_directory: pathlib.Path,
     checkpoint_path: str,
-    validation_data_path: str | list[str],
+    dev_run: bool,
     num_workers: int,
+    output_directory: pathlib.Path,
+    validation_data_path: str | list[str],
 ) -> None:
     # Set random seeds
     L.seed_everything(42, workers=True)
@@ -190,28 +191,31 @@ def validate(
 
     # Set up the validation dataset
     valid_dataset = ValidationSatelliteDataset(
-        zarr_path=validation_data_path,
-        history_mins=(num_history_steps - 1) * DATA_INTERVAL_SPACING_MINUTES,
         forecast_mins=NUM_FORECAST_STEPS * DATA_INTERVAL_SPACING_MINUTES,
-        sample_freq_mins=DATA_INTERVAL_SPACING_MINUTES,
+        history_mins=(num_history_steps - 1) * DATA_INTERVAL_SPACING_MINUTES,
         nan_to_num=True,
+        sample_freq_mins=DATA_INTERVAL_SPACING_MINUTES,
+        zarr_path=validation_data_path,
     )
     print(f"Loaded {len(valid_dataset)} sequences of cloud coverage data.")
 
     valid_dataloader = DataLoader(
-        dataset=valid_dataset,
         batch_size=batch_size,
-        num_workers=num_workers,
-        shuffle=False,
-        persistent_workers=True,
+        dataset=valid_dataset,
         drop_last=False,
+        num_workers=num_workers,
+        persistent_workers=True,
+        shuffle=False,
     )
 
     # Initialise the predictor and plot outputs
     plotting_callback = PlottingCallback(
         every_n_batches=3, output_directory=output_directory
     )
-    predictor = L.Trainer(callbacks=[plotting_callback], logger=False)
+    kwargs = {"limit_predict_batches": 2} if dev_run else {}
+    predictor = L.Trainer(
+        callbacks=[plotting_callback], logger=False, **kwargs
+    )
     predictor.predict(model, valid_dataloader)
 
 
@@ -225,6 +229,9 @@ if __name__ == "__main__":
     cmd_group.add_argument("--validate", action="store_true", help="Run validation")
     parser.add_argument("--batch-size", type=int, help="Batch size", default=2)
     parser.add_argument("--data-path", type=str, help="Path to the input data")
+    parser.add_argument(
+        "--dev-run", action="store_true", help="Perform a fast dev run"
+    )
     parser.add_argument(
         "--hidden-channels-space",
         type=int,
@@ -262,16 +269,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--num-workers", type=int, help="Number of workers to use", default=4
     )
-    parser.add_argument("--model-checkpoint", type=str, help="Path to model state dict")
     parser.add_argument("--output-directory", type=str, help="Path to save outputs to")
+    parser.add_argument("--validate-config-file", type=str, help="Validation config file")
     args = parser.parse_args()
-
-    # Get the appropriate PyTorch device
-    device = (
-        "mps"
-        if torch.backends.mps.is_available()
-        else "cuda" if torch.cuda.is_available() else "cpu"
-    )
 
     # Apply constraints on timesteps
     if args.num_forecast_steps > args.num_history_steps:
@@ -292,7 +292,7 @@ if __name__ == "__main__":
         ]
         train(
             batch_size=args.batch_size,
-            device=device,
+            dev_run=args.dev_run,
             hidden_channels_space=args.hidden_channels_space,
             hidden_channels_time=args.hidden_channels_time,
             num_convolutions_space=args.num_convolutions_space,
@@ -307,7 +307,6 @@ if __name__ == "__main__":
     if args.summarise:
         summarise(
             batch_size=args.batch_size,
-            device=device,
             hidden_channels_space=args.hidden_channels_space,
             hidden_channels_time=args.hidden_channels_time,
             num_convolutions_space=args.num_convolutions_space,
@@ -319,10 +318,13 @@ if __name__ == "__main__":
         validation_data_path = [
             str(path.resolve()) for path in pathlib.Path(args.data_path).glob("*.zarr")
         ]
+        with open(args.validate_config_file, "r") as f_config:
+            config=yaml.safe_load(f_config)
         validate(
             batch_size=args.batch_size,
-            output_directory=output_directory,
-            checkpoint_path=args.model_checkpoint,
+            checkpoint_path=config["model"]["params"]["checkpoint_path"],
+            dev_run=args.dev_run,
             num_workers=args.num_workers,
+            output_directory=output_directory,
             validation_data_path=validation_data_path,
         )
