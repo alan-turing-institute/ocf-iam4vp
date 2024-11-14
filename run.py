@@ -4,6 +4,7 @@ import random
 import shutil
 from contextlib import suppress
 
+import lightning as L
 import numpy as np
 import torch
 import torch.optim as optim
@@ -16,11 +17,12 @@ from cloudcasting.constants import (
 )
 from cloudcasting.dataset import SatelliteDataset, ValidationSatelliteDataset
 from cloudcasting.utils import numpy_validation_collate_fn
+from lightning.pytorch.callbacks import ModelCheckpoint
 from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 from torchinfo import summary
 
-from ocf_iam4vp import IAM4VP
+from ocf_iam4vp import IAM4VP, IAM4VPLightning, MetricsCallback
 
 
 def seed_worker(worker_id):
@@ -82,7 +84,7 @@ def train(
     num_history_steps: int,
     output_directory: pathlib.Path,
     training_data_path: str | list[str],
-    num_workers: int = 0,
+    num_workers: int = 4,
 ) -> None:
     # Load the training and test datasets
     dataset = SatelliteDataset(
@@ -95,9 +97,11 @@ def train(
         nan_to_num=True,
     )
     print(f"Loaded {len(dataset)} sequences of cloud coverage data.")
-    train_length=int(0.9 * len(dataset))
-    test_length=len(dataset) - train_length
-    train_dataset, test_dataset = torch.utils.data.random_split(dataset,(train_length,test_length))
+    train_length = int(0.9 * len(dataset))
+    test_length = len(dataset) - train_length
+    train_dataset, test_dataset = torch.utils.data.random_split(
+        dataset, (train_length, test_length)
+    )
     print(f"  {len(train_dataset)} will be used for training.")
     print(f"  {len(test_dataset)} will be used for testing")
 
@@ -109,6 +113,7 @@ def train(
         batch_size=batch_size,
         num_workers=num_workers,
         worker_init_fn=seed_worker,
+        persistent_workers=True,
         generator=gen,
     )
     test_dataloader = DataLoader(
@@ -116,11 +121,12 @@ def train(
         batch_size=batch_size,
         num_workers=num_workers,
         worker_init_fn=seed_worker,
+        persistent_workers=True,
         generator=gen,
     )
 
     # Create the model
-    model = IAM4VP(
+    model = IAM4VPLightning(
         (num_history_steps, NUM_CHANNELS, IMAGE_SIZE_TUPLE[0], IMAGE_SIZE_TUPLE[1]),
         num_forecast_steps=num_forecast_steps,
         hid_S=hidden_channels_space,
@@ -132,111 +138,35 @@ def train(
 
     # Log parameters
     print("Training IAM4VP model")
-    print(f"... hidden_channels_space {hidden_channels_space}")
-    print(f"... hidden_channels_time {hidden_channels_time}")
-    print(f"... num_convolutions_space {num_convolutions_space}")
-    print(f"... num_convolutions_time {num_convolutions_time}")
-    print(f"... num_forecast_steps {num_forecast_steps}")
+    print(f"... hidden_channels_space {model.hparams['hid_S']}")
+    print(f"... hidden_channels_time {model.hparams['hid_T']}")
+    print(f"... num_convolutions_space {model.hparams['N_S']}")
+    print(f"... num_convolutions_time {model.hparams['N_S']}")
+    print(f"... num_forecast_steps {model.hparams['num_forecast_steps']}")
     print(f"... num_history_steps {num_history_steps}")
     print(f"... output_directory {output_directory}")
 
-    # Loss and optimizer
-    best_test_loss = np.inf
-    optimizer = optim.Adam(model.parameters(), lr=0.0001)
+    # Initialise the trainer
+    val_every_n_epochs = 1
+    checkpoint_callback = ModelCheckpoint(
+        dirpath=output_directory,
+        save_top_k=-1,
+        every_n_epochs=val_every_n_epochs,
+        monitor="test_loss",
+        filename="{epoch}-{test_loss:.2f}",
+    )
+    metrics_callback = MetricsCallback()
+    trainer = L.Trainer(
+        logger=False,
+        callbacks=[checkpoint_callback, metrics_callback],
+        max_epochs=num_epochs,
+        check_val_every_n_epoch=val_every_n_epochs,
+    )
 
-    # Train for one epoch
-    for epoch in range(num_epochs + 1):
-        # Load existing model if there is one
-        with suppress(StopIteration):
-            existing_state_dict = next(
-                output_directory.glob(f"best-model-epoch-{epoch}-*")
-            )
-            print(f"Found existing model for epoch {epoch}")
-            model.load_state_dict(
-                torch.load(existing_state_dict, map_location=device, weights_only=True)
-            )
-            print(f"Skipping epoch {epoch} after loading weights from existing model")
-            continue
-
-        # Do not run epoch 0 - it's just for preloading a model
-        if epoch < 1:
-            continue
-
-        # Training loop
-        model.train()
-        train_losses = []
-        for batch_X, batch_y in tqdm.tqdm(train_dataloader):
-            # Send batch tensors to the current device
-            # Both tensors have shape (B, C, T, H, W)
-            batch_X: torch.Tensor = batch_X.to(device)
-            batch_y: torch.Tensor = batch_y.to(device)
-
-            # Mask missing data in the target
-            batch_y[batch_y == -1] == torch.nan
-
-            # Generate the requested number of forecasts
-            y_hats: list[torch.Tensor] = []
-            single_forecast_losses = []
-            for idx_forecast in range(model.num_forecast_steps):
-                # Zero the parameter gradients
-                optimizer.zero_grad()
-
-                # Forward pass for the next time step (batch_size, channels, height, width)
-                y_hat = model(batch_X, y_hats)
-
-                # Calculate the loss
-                y = batch_y[:, :, idx_forecast, :, :]
-                loss = torch.nanmean(
-                    torch.nn.functional.l1_loss(y_hat, y, reduction="none")
-                )
-                single_forecast_losses.append(loss.item())
-                del y
-
-                # Backward pass and optimize
-                loss.backward()
-                optimizer.step()
-                del loss
-
-                # Append latest prediction to queue
-                y_hats.append(y_hat.detach())
-
-            # Calculate loss for the full set of forecasts
-            train_losses.append(np.array(single_forecast_losses).mean())
-
-            # Free up memory
-            del batch_X, batch_y, y_hats
-
-        # Test loop
-        model.eval()
-        test_losses = []
-        for batch_X, batch_y in tqdm.tqdm(test_dataloader):
-            # Generate a prediction
-            batch_y_hat = model.predict(batch_X.to(device))
-
-            # Calculate loss
-            batch_y = batch_y.to(device)
-            loss = torch.nanmean(
-                torch.nn.functional.l1_loss(batch_y_hat, batch_y, reduction="none")
-            )
-            test_losses.append(loss.item())
-
-        # Evaluate and save model if appropriate
-        train_loss = np.array(train_losses).mean()
-        test_loss = np.array(test_losses).mean()
-        print(
-            f"Epoch [{epoch}/{num_epochs}], mean training loss: {train_loss:.4f}, mean testing loss {test_loss:.4f}"
-        )
-        if test_loss < best_test_loss:
-            print(f"... testing loss improved from {best_test_loss:.4f} to {test_loss:.4f}")
-            best_model_path = (
-                output_directory
-                / f"best-model-epoch-{epoch}-loss-{test_loss:.3g}.state-dict.pt"
-            )
-            pathlib.Path.unlink(best_model_path, missing_ok=True)
-            torch.save(model.state_dict(), best_model_path)
-            best_test_loss = test_loss
-        else:
-            print(f"... testing loss {test_loss:.4f} did not improve")
+    # Perform training and validation
+    trainer.fit(
+        model=model, train_dataloaders=train_dataloader, val_dataloaders=test_dataloader
+    )
 
 
 def validate(
@@ -285,6 +215,7 @@ def validate(
         sample_freq_mins=DATA_INTERVAL_SPACING_MINUTES,
         nan_to_num=True,
     )
+    print(f"Loaded {len(valid_dataset)} sequences of cloud coverage data.")
 
     valid_dataloader = DataLoader(
         dataset=valid_dataset,
