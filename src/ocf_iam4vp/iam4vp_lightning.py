@@ -39,30 +39,50 @@ class IAM4VPLightning(L.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.model = IAM4VP(shape_in, num_forecast_steps, hid_S, hid_T, N_S, N_T)
+        # Enable manual optimisation to reduce memory usage in the forecast loop
+        # This means that we have make the backward pass and optimizer calls explicit
+        self.automatic_optimization = False
 
     def training_step(
-        self, batch: tuple[torch.Tensor, torch.Tensor], _: int
+        self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
         # Split the batch into X and y
         batch_X, batch_y = batch
 
-        # Generate the requested number of forecasts
+        # Get optimizers
+        optimizers = self.optimizers()
+
+        # Prepare prediction and loss lists
         y_hats: list[torch.Tensor] = []
-        single_forecast_losses = []
+        losses: list[float] = []
+
+        # Generate the requested number of forecasts
         for idx_forecast in range(self.model.num_forecast_steps):
+            # Zero the parameter gradients
+            optimizers.zero_grad()
+
             # Forward pass for the next time step (batch_size, channels, height, width)
             y_hat = self.model(batch_X, y_hats)
 
             # Calculate the loss
-            y = batch_y[:, :, idx_forecast, :, :]
-            single_forecast_losses.append(self.loss(y_hat, y))
-            del y
+            loss = self.loss(y_hat, batch_y[:, :, idx_forecast, :, :])
 
-            # Append latest prediction to queue
+            # Backward pass and optimize
+            self.manual_backward(loss)
+            optimizers.step()
+
+            # Keep track of loss values
+            losses.append(loss.item())
+            del loss
+
+            # Detach latest prediction to save memory before adding it to the queue
             y_hats.append(y_hat.detach())
 
+        # Free up memory
+        del batch_X, batch_y
+
         # Calculate mean loss for the full set of forecasts
-        loss = torch.stack(single_forecast_losses).mean()
+        loss = torch.Tensor(losses).mean()
         self.log("train_loss", loss)
         return loss
 
