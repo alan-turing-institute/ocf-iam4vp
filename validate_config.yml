@@ -8,7 +8,7 @@ model:
     num_forecast_steps: 8
     num_history_steps: 16
     num_training_epochs: 1
-    state_dict_path: /bask/projects/v/vjgo8416-climate/users/saoq4015/models/iam4vp/batch-1-forecast-8-history-16-hcs-64-hct-256-ns-4-nt-5/best-model-epoch-1-loss-0.000382.state-dict.pt
+    checkpoint_path: /bask/projects/v/vjgo8416-climate/users/saoq4015/models/iam4vp/0.3.1/batch-1-forecast-8-history-16-hcs-64-hct-256-ns-4-nt-5/epoch=1-test_loss=0.000382.ckpt
     version: "0.3.1"
 validation:
   data_path: "/bask/projects/v/vjgo8416-climate/shared/data/eumetsat/testing2022/2022_test_nonhrv.zarr"

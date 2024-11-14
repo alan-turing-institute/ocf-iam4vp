@@ -1,14 +1,10 @@
 import argparse
 import pathlib
 import random
-import shutil
-from contextlib import suppress
 
 import lightning as L
 import numpy as np
 import torch
-import torch.optim as optim
-import tqdm
 from cloudcasting.constants import (
     DATA_INTERVAL_SPACING_MINUTES,
     IMAGE_SIZE_TUPLE,
@@ -176,7 +172,7 @@ def validate(
     # Set random seeds
     L.seed_everything(42, workers=True)
 
-    # Create the model
+    # Load the pretrained model
     model = IAM4VPLightning.load_from_checkpoint(
         checkpoint_path, num_forecast_steps=NUM_FORECAST_STEPS
     )
