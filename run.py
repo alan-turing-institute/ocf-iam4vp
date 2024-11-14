@@ -160,6 +160,7 @@ def train(
         train_dataloaders=train_dataloader,
         val_dataloaders=test_dataloader,
     )
+    print("Finished training IAM4VP model")
 
 
 def validate(
@@ -213,10 +214,9 @@ def validate(
         every_n_batches=3, output_directory=output_directory
     )
     kwargs = {"limit_predict_batches": 2} if dev_run else {}
-    predictor = L.Trainer(
-        callbacks=[plotting_callback], logger=False, **kwargs
-    )
+    predictor = L.Trainer(callbacks=[plotting_callback], logger=False, **kwargs)
     predictor.predict(model, valid_dataloader)
+    print("Finished validating IAM4VP model")
 
 
 if __name__ == "__main__":
@@ -229,9 +229,7 @@ if __name__ == "__main__":
     cmd_group.add_argument("--validate", action="store_true", help="Run validation")
     parser.add_argument("--batch-size", type=int, help="Batch size", default=2)
     parser.add_argument("--data-path", type=str, help="Path to the input data")
-    parser.add_argument(
-        "--dev-run", action="store_true", help="Perform a fast dev run"
-    )
+    parser.add_argument("--dev-run", action="store_true", help="Perform a fast dev run")
     parser.add_argument(
         "--hidden-channels-space",
         type=int,
@@ -270,7 +268,9 @@ if __name__ == "__main__":
         "--num-workers", type=int, help="Number of workers to use", default=0
     )
     parser.add_argument("--output-directory", type=str, help="Path to save outputs to")
-    parser.add_argument("--validate-config-file", type=str, help="Validation config file")
+    parser.add_argument(
+        "--validate-config-file", type=str, help="Validation config file"
+    )
     args = parser.parse_args()
 
     # Apply constraints on timesteps
@@ -319,7 +319,7 @@ if __name__ == "__main__":
             str(path.resolve()) for path in pathlib.Path(args.data_path).glob("*.zarr")
         ]
         with open(args.validate_config_file, "r") as f_config:
-            config=yaml.safe_load(f_config)
+            config = yaml.safe_load(f_config)
         validate(
             batch_size=args.batch_size,
             checkpoint_path=config["model"]["params"]["checkpoint_path"],
