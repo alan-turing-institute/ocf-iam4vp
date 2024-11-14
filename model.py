@@ -1,12 +1,8 @@
-from cloudcasting.constants import (
-    IMAGE_SIZE_TUPLE,
-    NUM_CHANNELS,
-    NUM_FORECAST_STEPS,
-)
+import numpy as np
+import torch
+from cloudcasting.constants import IMAGE_SIZE_TUPLE, NUM_CHANNELS, NUM_FORECAST_STEPS
 from cloudcasting.models import AbstractModel
 
-import torch
-import numpy as np
 from ocf_iam4vp import IAM4VP
 
 
