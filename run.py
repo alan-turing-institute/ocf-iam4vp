@@ -67,9 +67,9 @@ def summarise(
 
 def train(
     batch_size: int,
-    dev_run: bool,
     hidden_channels_space: int,
     hidden_channels_time: int,
+    max_batches: int,
     num_convolutions_space: int,
     num_convolutions_time: int,
     num_epochs: int,
@@ -93,7 +93,7 @@ def train(
         nan_to_num=True,
     )
     print(f"Loaded {len(dataset)} sequences of cloud coverage data.")
-    train_length = int(0.9 * len(dataset))
+    train_length = int(0.8 * len(dataset))
     test_length = len(dataset) - train_length
     train_dataset, test_dataset = torch.utils.data.random_split(
         dataset, (train_length, test_length)
@@ -145,7 +145,14 @@ def train(
         save_top_k=-1,
     )
     metrics_callback = MetricsCallback()
-    kwargs = {"limit_train_batches": 2, "limit_val_batches": 2} if dev_run else {}
+    kwargs = (
+        {
+            "limit_train_batches": max_batches,
+            "limit_val_batches": int(0.2 * max_batches),
+        }
+        if max_batches > 0
+        else {}
+    )
     trainer = L.Trainer(
         callbacks=[checkpoint_callback, metrics_callback],
         check_val_every_n_epoch=val_every_n_epochs,
@@ -166,7 +173,7 @@ def train(
 def validate(
     batch_size: int,
     checkpoint_path: str,
-    dev_run: bool,
+    max_batches: int,
     num_workers: int,
     output_directory: pathlib.Path,
     validation_data_path: str | list[str],
@@ -213,7 +220,7 @@ def validate(
     plotting_callback = PlottingCallback(
         every_n_batches=3, output_directory=output_directory
     )
-    kwargs = {"limit_predict_batches": 2} if dev_run else {}
+    kwargs = {"limit_predict_batches": max_batches} if max_batches > 0 else {}
     predictor = L.Trainer(callbacks=[plotting_callback], logger=False, **kwargs)
     predictor.predict(model, valid_dataloader)
     print("Finished validating IAM4VP model")
@@ -229,7 +236,6 @@ if __name__ == "__main__":
     cmd_group.add_argument("--validate", action="store_true", help="Run validation")
     parser.add_argument("--batch-size", type=int, help="Batch size", default=2)
     parser.add_argument("--data-path", type=str, help="Path to the input data")
-    parser.add_argument("--dev-run", action="store_true", help="Perform a fast dev run")
     parser.add_argument(
         "--hidden-channels-space",
         type=int,
@@ -241,6 +247,12 @@ if __name__ == "__main__":
         type=int,
         help="Number of temporal hidden channels",
         default=512,
+    )
+    parser.add_argument(
+        "--max-batches",
+        type=int,
+        help="Maximum number of batches",
+        default=-1,
     )
     parser.add_argument(
         "--num-convolutions-space",
@@ -292,9 +304,9 @@ if __name__ == "__main__":
         ]
         train(
             batch_size=args.batch_size,
-            dev_run=args.dev_run,
             hidden_channels_space=args.hidden_channels_space,
             hidden_channels_time=args.hidden_channels_time,
+            max_batches=args.max_batches,
             num_convolutions_space=args.num_convolutions_space,
             num_convolutions_time=args.num_convolutions_time,
             num_epochs=args.num_epochs,
@@ -323,7 +335,7 @@ if __name__ == "__main__":
         validate(
             batch_size=args.batch_size,
             checkpoint_path=config["model"]["params"]["checkpoint_path"],
-            dev_run=args.dev_run,
+            max_batches=args.max_batches,
             num_workers=args.num_workers,
             output_directory=output_directory,
             validation_data_path=validation_data_path,
