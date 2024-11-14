@@ -17,13 +17,6 @@ class IAM4VPCloudcaster(AbstractModel):
         checkpoint_path: str,
         version: str,
     ) -> None:
-        # All models must include `history_steps` as a parameter. This is the number of previous
-        # frames that the model uses to makes its predictions. This should not be more than 25, i.e.
-        # 6 hours (inclusive of end points) of 15 minutely data.
-        # The history_steps parameter should be specified in `validate_config.yml`, along with
-        # any other parameters (replace `example_parameter` with as many other parameters as you need to initialize your model, and also add them to `validate_config.yml` under `model: params`)
-        super().__init__(num_history_steps)
-
         # Load the pretrained model
         self.model = IAM4VPLightning.load_from_checkpoint(
             checkpoint_path, num_forecast_steps=NUM_FORECAST_STEPS
@@ -32,6 +25,11 @@ class IAM4VPCloudcaster(AbstractModel):
         num_training_epochs = int(
             re.search(r"epoch=(\d+)-test_loss.*", checkpoint_path).group(1)
         )
+
+        # All models must include `history_steps` as a parameter. This is the number of
+        # previous frames that the model uses to makes its predictions. This should not
+        # be more than 25, i.e. 6 hours (inclusive of end points) of 15 minutely data.
+        super().__init__(num_history_steps)
 
         self.hyperparameters = {
             "hidden_channels_space": self.model.hparams["hid_S"],
