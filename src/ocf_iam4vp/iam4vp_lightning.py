@@ -44,6 +44,7 @@ class IAM4VPLightning(L.LightningModule):
         self.automatic_optimization = False
 
     def compile(self) -> None:
+        torch.set_float32_matmul_precision("high")
         self.model = torch.compile(self.model)
 
     def training_step(
