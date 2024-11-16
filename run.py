@@ -105,12 +105,14 @@ def train(
         dataset=train_dataset,
         num_workers=num_workers,
         persistent_workers=(num_workers > 0),
+        pin_memory=True,
     )
     test_dataloader = DataLoader(
         batch_size=batch_size,
         dataset=test_dataset,
         num_workers=num_workers,
         persistent_workers=(num_workers > 0),
+        pin_memory=True,
     )
 
     # Create the model
