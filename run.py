@@ -125,6 +125,9 @@ def train(
         N_T=num_convolutions_time,
     )
 
+    # Compile the model
+    model.compile()
+
     # Log parameters
     print("Training IAM4VP model")
     print(f"... hidden_channels_space {model.hparams['hid_S']}")
@@ -186,6 +189,9 @@ def validate(
         checkpoint_path, num_forecast_steps=NUM_FORECAST_STEPS
     )
     num_history_steps = model.hparams["shape_in"][0]
+
+    # Compile the model
+    model.compile()
 
     # Log parameters
     print("Validating IAM4VP model")

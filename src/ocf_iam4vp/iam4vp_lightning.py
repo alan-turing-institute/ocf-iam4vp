@@ -43,6 +43,9 @@ class IAM4VPLightning(L.LightningModule):
         # This means that we have make the backward pass and optimizer calls explicit
         self.automatic_optimization = False
 
+    def compile(self) -> None:
+        self.model = torch.compile(self.model)
+
     def training_step(
         self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
