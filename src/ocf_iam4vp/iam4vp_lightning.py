@@ -76,7 +76,7 @@ class IAM4VPLightning(L.LightningModule):
             optimizers.step()
 
             # Keep track of loss values
-            losses.append(loss.item())
+            losses.append(loss.detach())
             del loss
 
             # Detach latest prediction to save memory before adding it to the queue
@@ -86,7 +86,7 @@ class IAM4VPLightning(L.LightningModule):
         del batch_X, batch_y
 
         # Calculate mean loss for the full set of forecasts
-        loss = torch.Tensor(losses).mean()
+        loss = torch.stack(losses).mean()
         self.log("train_loss", loss)
         return loss
 
