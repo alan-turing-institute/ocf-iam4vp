@@ -8,12 +8,12 @@ model:
     num_forecast_steps: 8
     num_history_steps: 16
     num_training_epochs: 1
-    checkpoint_path: /bask/projects/v/vjgo8416-climate/users/saoq4015/models/iam4vp/0.3.2/batch-1-forecast-8-history-16-hcs-64-hct-256-ns-4-nt-5/epoch=1-test_loss=0.000382.ckpt
-    version: "0.3.2"
+    checkpoint_path: /bask/projects/v/vjgo8416-climate/users/saoq4015/models/iam4vp/0.3.3/batch-1-forecast-8-history-16-hcs-64-hct-256-ns-4-nt-5/epoch=1-test_loss=0.000382.ckpt
+    version: "0.3.3"
 validation:
   data_path: "/bask/projects/v/vjgo8416-climate/shared/data/eumetsat/testing2022/2022_test_nonhrv.zarr"
   wandb_project_name: "cloudcasting"
-  wandb_run_name: "IAM4VP-0.3.2-e1"
+  wandb_run_name: "IAM4VP-0.3.3-e1"
   nan_to_num: False
   batch_size: 2
   num_workers: 0
