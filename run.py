@@ -1,9 +1,9 @@
 import argparse
 import pathlib
-import yaml
 
 import lightning as L
 import torch
+import yaml
 from cloudcasting.constants import (
     DATA_INTERVAL_SPACING_MINUTES,
     IMAGE_SIZE_TUPLE,
@@ -189,7 +189,7 @@ def validate(
     L.seed_everything(42, workers=True)
 
     # Load the pretrained model
-    model = IAM4VPLightning.load_from_checkpoint(
+    model = IAM4VPLightning.load_from_compiled_checkpoint(
         checkpoint_path, num_forecast_steps=NUM_FORECAST_STEPS
     )
     num_history_steps = model.hparams["shape_in"][0]

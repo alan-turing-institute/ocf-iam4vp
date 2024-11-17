@@ -1,9 +1,13 @@
+from typing import Any, cast
+
+import lightning as L
+import numpy as np
 import torch
 import torch.optim as optim
-import lightning as L
-from tqdm import tqdm
-import numpy as np
+from lightning.pytorch.core.saving import _load_state
 from matplotlib import pyplot as plt
+from tqdm import tqdm
+
 from .iam4vp import IAM4VP
 
 
@@ -46,6 +50,26 @@ class IAM4VPLightning(L.LightningModule):
     def compile(self) -> None:
         torch.set_float32_matmul_precision("high")
         self.model = torch.compile(self.model)
+
+    @classmethod
+    def load_from_compiled_checkpoint(
+        cls, checkpoint_path: str, **kwargs: Any
+    ) -> "IAM4VPLightning":
+        checkpoint = torch.load(checkpoint_path)
+        # Remove "_orig_mod" prefix from checkpoint keys
+        state_dict = {
+            k.replace("model._orig_mod.", "model."): v
+            for k, v in checkpoint["state_dict"].items()
+        }
+        checkpoint["state_dict"] = state_dict
+        # Perform the rest of 'load_from_checkpoint'
+        checkpoint[cls.CHECKPOINT_HYPER_PARAMS_KEY].update(kwargs)
+        model = _load_state(cls, checkpoint, strict=True, **kwargs)
+        device = next(
+            (t for t in state_dict.values() if isinstance(t, torch.Tensor)),
+            torch.tensor(0),
+        ).device
+        return cast("IAM4VPLightning", model.to(device))
 
     def training_step(
         self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int

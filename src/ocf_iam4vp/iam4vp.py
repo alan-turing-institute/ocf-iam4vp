@@ -3,7 +3,7 @@
 import torch
 from torch import nn
 
-from .modules import Attention, ConvNextTimeEmbedLKA, ConvNextTimeEmbed, ConvSC, TimeMLP
+from .modules import Attention, ConvNextTimeEmbed, ConvNextTimeEmbedLKA, ConvSC, TimeMLP
 
 
 def stride_generator(N: int, reverse=False) -> list[int]:
