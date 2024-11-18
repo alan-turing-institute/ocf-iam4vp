@@ -105,8 +105,8 @@ def train(
     train_dataset, test_dataset = torch.utils.data.random_split(
         dataset, (train_length, test_length)
     )
-    print(f"  {train_length} will be used for training.")
-    print(f"  {test_length} will be used for testing")
+    print(f"... {train_length} will be used for training.")
+    print(f"... {test_length} will be used for testing")
 
     # Construct appropriate data loaders
     train_dataloader = DataLoader(
@@ -134,7 +134,7 @@ def train(
 
     # Create the model
     if resume_from_checkpoint:
-        print("Loading model from checkpoint")
+        print("Loading IAM4VP model from checkpoint")
         model = IAM4VPLightning.load_from_checkpoint(checkpoint_path)
         assert model.hparams["hid_S"] == hidden_channels_space
         assert model.hparams["hid_T"] == hidden_channels_time
@@ -143,7 +143,7 @@ def train(
         assert model.hparams["num_forecast_steps"] == num_forecast_steps
         assert model.hparams["shape_in"][0] == num_history_steps
     else:
-        print("Creating model")
+        print("Creating IAM4VP model")
         model = IAM4VPLightning(
             (num_history_steps, NUM_CHANNELS, IMAGE_SIZE_TUPLE[0], IMAGE_SIZE_TUPLE[1]),
             num_forecast_steps=num_forecast_steps,
@@ -154,7 +154,6 @@ def train(
         )
 
     # Log parameters
-    print("Training IAM4VP model")
     model.describe({"output_directory": output_directory})
 
     # Initialise the trainer
@@ -178,6 +177,7 @@ def train(
     )
 
     # Perform training and validation
+    print("Start training IAM4VP model")
     trainer.fit(
         model=model,
         train_dataloaders=train_dataloader,
