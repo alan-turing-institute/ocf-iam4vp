@@ -83,6 +83,11 @@ def train(
     # Set random seeds
     L.seed_everything(42, workers=True)
 
+    # How often to run validation
+    val_every_n_batches = (
+        batches_per_checkpoint if batches_per_checkpoint > 0 else len(dataset)
+    )
+
     # Load the training and test datasets
     dataset = SatelliteDataset(
         zarr_path=training_data_path,
@@ -94,9 +99,9 @@ def train(
         nan_to_num=True,
     )
     print(f"Loaded {len(dataset)} steps of cloud coverage data.")
-    train_dataset, test_dataset = torch.utils.data.random_split(dataset, (0.8, 0.2))
-    train_length = len(train_dataset)
-    test_length = len(test_dataset)
+    test_length = min(val_every_n_batches, 0.2 * len(dataset))
+    train_length = len(dataset) - test_length
+    train_dataset, test_dataset = torch.utils.data.random_split(dataset, (train_length, test_length))
     print(f"  {train_length} will be used for training.")
     print(f"  {test_length} will be used for testing")
 
