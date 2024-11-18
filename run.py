@@ -162,6 +162,7 @@ def train(
         check_val_every_n_epoch=val_every_n_epochs,
         logger=False,
         max_epochs=num_epochs,
+        precision="bf16",
         **kwargs,
     )
 

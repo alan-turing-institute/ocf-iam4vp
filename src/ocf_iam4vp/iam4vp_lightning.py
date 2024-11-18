@@ -43,7 +43,7 @@ class IAM4VPLightning(L.LightningModule):
         # Enable manual optimisation to reduce memory usage in the forecast loop
         # This means that we have make the backward pass and optimizer calls explicit
         self.automatic_optimization = False
-        torch.set_float32_matmul_precision("high")
+        torch.set_float32_matmul_precision("medium")
 
     def training_step(
         self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int
