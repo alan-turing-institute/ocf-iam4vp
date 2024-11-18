@@ -165,8 +165,8 @@ def train(
         save_top_k=-1,
     )
     metrics_callback = MetricsCallback(
-        inputs_per_epoch=train_length,
-        steps_per_input=num_forecast_steps,
+        batches_per_epoch=len(train_dataloader),
+        steps_per_batch=num_forecast_steps,
     )
     trainer = L.Trainer(
         callbacks=[metrics_callback, checkpoint_callback],

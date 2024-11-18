@@ -135,13 +135,13 @@ class IAM4VPLightning(L.LightningModule):
 class MetricsCallback(L.Callback):
     """PyTorch Lightning metric callback."""
 
-    def __init__(self, inputs_per_epoch: int, steps_per_input: int) -> None:
+    def __init__(self, batches_per_epoch: int, steps_per_batch: int) -> None:
         super().__init__()
+        self.batches_per_epoch = batches_per_epoch
         self.best_test_loss = torch.inf
-        self.inputs_per_epoch = inputs_per_epoch
         self.metric_names = ("train_loss", "test_loss")
-        self.steps_per_input = steps_per_input
         self.start_time = time.perf_counter()
+        self.steps_per_batch = steps_per_batch
 
     def on_validation_end(self, trainer: L.Trainer, _) -> None:
         # Reset the timer
@@ -156,17 +156,17 @@ class MetricsCallback(L.Callback):
 
         # The first test run will be done before training
         if "train_loss" not in metrics:
-            tqdm.write(f"Initial (untrained) testing loss: {metrics['test_loss']:.4f}")
+            tqdm.write(f"... mean (untrained) testing loss: {metrics['test_loss']:.4f}")
             self.best_test_loss = metrics["test_loss"]
             return
 
         n_inputs = (
-            int(trainer.global_step / self.steps_per_input)  # total inputs processed
-            - trainer.current_epoch * self.inputs_per_epoch  # ... minus previous epochs
+            int(trainer.global_step / self.steps_per_batch)  # total inputs processed
+            - trainer.current_epoch * self.batches_per_epoch  # minus previous epochs
         )
         rate = trainer.val_check_interval / elapsed
         tqdm.write(
-            f"Epoch {trainer.current_epoch}: Processed {n_inputs} / {self.inputs_per_epoch} inputs in {elapsed:.1f}s [{rate:.3f} it/s]"
+            f"Epoch {trainer.current_epoch}: Processed {n_inputs} / {self.batches_per_epoch} batches in {elapsed:.1f}s [{rate:.3f} it/s]"
         )
         if "train_loss" in metrics:
             tqdm.write(f"... mean training loss: {metrics['train_loss']:.4f}")
