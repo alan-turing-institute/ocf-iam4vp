@@ -70,7 +70,6 @@ def train(
     batches_per_checkpoint: int,
     hidden_channels_space: int,
     hidden_channels_time: int,
-    max_batches: int,
     num_convolutions_space: int,
     num_convolutions_time: int,
     num_epochs: int,
@@ -95,13 +94,8 @@ def train(
     )
     print(f"Loaded {len(dataset)} steps of cloud coverage data.")
     train_dataset, test_dataset = torch.utils.data.random_split(dataset, (0.8, 0.2))
-
-    # Record train and test sizes
-    train_length = max_batches if max_batches > 0 else len(train_dataset)
-    val_every_n_batches = (
-        batches_per_checkpoint if batches_per_checkpoint > 0 else train_length
-    )
-    test_length = min(int(0.2 * val_every_n_batches), len(test_dataset))
+    train_length = len(train_dataset)
+    test_length = len(test_dataset)
     print(f"  {train_length} will be used for training.")
     print(f"  {test_length} will be used for testing")
 
@@ -145,6 +139,9 @@ def train(
     print(f"... output_directory {output_directory}")
 
     # Initialise the trainer
+    val_every_n_batches = (
+        batches_per_checkpoint if batches_per_checkpoint > 0 else train_length
+    )
     checkpoint_callback = ModelCheckpoint(
         auto_insert_metric_name=False,
         dirpath=output_directory,
@@ -156,21 +153,12 @@ def train(
         inputs_per_epoch=train_length,
         steps_per_input=num_forecast_steps,
     )
-    kwargs = (
-        {
-            "limit_train_batches": train_length,
-            "limit_val_batches": test_length,
-        }
-        if max_batches > 0
-        else {}
-    )
     trainer = L.Trainer(
         callbacks=[checkpoint_callback, metrics_callback],
         logger=False,
         max_epochs=num_epochs,
         precision="bf16-mixed",
         val_check_interval=val_every_n_batches,
-        **kwargs,
     )
 
     # Perform training and validation
@@ -185,7 +173,6 @@ def train(
 def validate(
     batch_size: int,
     checkpoint_path: str,
-    max_batches: int,
     num_workers: int,
     output_directory: pathlib.Path,
     validation_data_path: str | list[str],
@@ -218,7 +205,7 @@ def validate(
         zarr_path=validation_data_path,
     )
     print(f"Loaded {len(valid_dataset)} sequences of cloud coverage data.")
-    valid_length = max_batches if max_batches > 0 else len(valid_dataset)
+    valid_length = len(valid_dataset)
     print(f"  {valid_length} will be used for validation.")
 
     valid_dataloader = DataLoader(
@@ -234,8 +221,7 @@ def validate(
     plotting_callback = PlottingCallback(
         every_n_batches=3, output_directory=output_directory
     )
-    kwargs = {"limit_predict_batches": valid_length} if max_batches > 0 else {}
-    predictor = L.Trainer(callbacks=[plotting_callback], logger=False, **kwargs)
+    predictor = L.Trainer(callbacks=[plotting_callback], logger=False)
     predictor.predict(model, valid_dataloader)
     print("Finished validating IAM4VP model")
 
@@ -267,12 +253,6 @@ if __name__ == "__main__":
         type=int,
         help="Number of temporal hidden channels",
         default=512,
-    )
-    parser.add_argument(
-        "--max-batches",
-        type=int,
-        help="Maximum number of batches",
-        default=-1,
     )
     parser.add_argument(
         "--num-convolutions-space",
@@ -327,7 +307,6 @@ if __name__ == "__main__":
             batches_per_checkpoint=args.batches_per_checkpoint,
             hidden_channels_space=args.hidden_channels_space,
             hidden_channels_time=args.hidden_channels_time,
-            max_batches=args.max_batches,
             num_convolutions_space=args.num_convolutions_space,
             num_convolutions_time=args.num_convolutions_time,
             num_epochs=args.num_epochs,
@@ -356,7 +335,6 @@ if __name__ == "__main__":
         validate(
             batch_size=args.batch_size,
             checkpoint_path=config["model"]["params"]["checkpoint_path"],
-            max_batches=args.max_batches,
             num_workers=args.num_workers,
             output_directory=output_directory,
             validation_data_path=validation_data_path,
