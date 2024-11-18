@@ -142,13 +142,7 @@ def train(
 
     # Log parameters
     print("Training IAM4VP model")
-    print(f"... hidden_channels_space {model.hparams['hid_S']}")
-    print(f"... hidden_channels_time {model.hparams['hid_T']}")
-    print(f"... num_convolutions_space {model.hparams['N_S']}")
-    print(f"... num_convolutions_time {model.hparams['N_S']}")
-    print(f"... num_forecast_steps {model.hparams['num_forecast_steps']}")
-    print(f"... num_history_steps {num_history_steps}")
-    print(f"... output_directory {output_directory}")
+    model.describe({"output_directory": output_directory})
 
     # Initialise the trainer
     val_every_n_batches = (
@@ -200,13 +194,7 @@ def validate(
 
     # Log parameters
     print("Validating IAM4VP model")
-    print(f"... hidden_channels_space {model.hparams['hid_S']}")
-    print(f"... hidden_channels_time {model.hparams['hid_T']}")
-    print(f"... num_convolutions_space {model.hparams['N_S']}")
-    print(f"... num_convolutions_time {model.hparams['N_S']}")
-    print(f"... num_forecast_steps {NUM_FORECAST_STEPS}")
-    print(f"... num_history_steps {num_history_steps}")
-    print(f"... output_directory {output_directory}")
+    model.describe({"output_directory": output_directory})
 
     # Set up the validation dataset
     valid_dataset = ValidationSatelliteDataset(

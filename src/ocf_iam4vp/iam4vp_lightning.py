@@ -45,6 +45,16 @@ class IAM4VPLightning(L.LightningModule):
         self.automatic_optimization = False
         torch.set_float32_matmul_precision("medium")
 
+    def describe(self, extra_values: dict[str, str] = {}) -> None:
+        print(f"... hidden_channels_space {self.hparams['hid_S']}")
+        print(f"... hidden_channels_time {self.hparams['hid_T']}")
+        print(f"... num_convolutions_space {self.hparams['N_S']}")
+        print(f"... num_convolutions_time {self.hparams['N_T']}")
+        print(f"... num_forecast_steps {self.hparams['num_forecast_steps']}")
+        print(f"... num_history_steps {self.hparams['shape_in'][0]}")
+        for key, value in extra_values.items():
+            print(f"... {key} {value}")
+
     def training_step(
         self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
