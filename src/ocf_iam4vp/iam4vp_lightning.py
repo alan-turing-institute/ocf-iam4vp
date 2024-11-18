@@ -122,10 +122,12 @@ class IAM4VPLightning(L.LightningModule):
 class MetricsCallback(L.Callback):
     """PyTorch Lightning metric callback."""
 
-    def __init__(self):
+    def __init__(self, inputs_per_epoch: int, steps_per_input: int) -> None:
         super().__init__()
         self.best_test_loss = torch.inf
+        self.inputs_per_epoch = inputs_per_epoch
         self.metric_names = ("train_loss", "test_loss")
+        self.steps_per_input = steps_per_input
 
     def on_validation_end(self, trainer: L.Trainer, _) -> None:
         metrics = {}
@@ -139,8 +141,12 @@ class MetricsCallback(L.Callback):
             self.best_test_loss = metrics["test_loss"]
             return
 
+        n_inputs = (
+            int(trainer.global_step / self.steps_per_input)  # total inputs processed
+            - trainer.current_epoch * self.inputs_per_epoch  # ... minus previous epochs
+        )
         tqdm.write(
-            f"Completed {trainer.current_epoch + 1} / {trainer.max_epochs} epochs:"
+            f"Epoch {trainer.current_epoch}: Processed {n_inputs} / {self.inputs_per_epoch} inputs:"
         )
         if "train_loss" in metrics:
             tqdm.write(f"... mean training loss: {metrics['train_loss']:.4f}")

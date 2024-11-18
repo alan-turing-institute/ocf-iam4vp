@@ -67,6 +67,7 @@ def summarise(
 
 def train(
     batch_size: int,
+    batches_per_checkpoint: int,
     hidden_channels_space: int,
     hidden_channels_time: int,
     max_batches: int,
@@ -92,10 +93,15 @@ def train(
         sample_freq_mins=DATA_INTERVAL_SPACING_MINUTES,
         nan_to_num=True,
     )
-    print(f"Loaded {len(dataset)} sequences of cloud coverage data.")
+    print(f"Loaded {len(dataset)} steps of cloud coverage data.")
     train_dataset, test_dataset = torch.utils.data.random_split(dataset, (0.8, 0.2))
+
+    # Record train and test sizes
     train_length = max_batches if max_batches > 0 else len(train_dataset)
-    test_length = int(0.2 * max_batches) if max_batches > 0 else len(test_dataset)
+    val_every_n_batches = (
+        batches_per_checkpoint if batches_per_checkpoint > 0 else train_length
+    )
+    test_length = min(int(0.2 * val_every_n_batches), len(test_dataset))
     print(f"  {train_length} will be used for training.")
     print(f"  {test_length} will be used for testing")
 
@@ -116,7 +122,6 @@ def train(
         num_workers=num_workers,
         persistent_workers=(num_workers > 0),
         pin_memory=True,
-        shuffle=True,
     )
 
     # Create the model
@@ -140,15 +145,17 @@ def train(
     print(f"... output_directory {output_directory}")
 
     # Initialise the trainer
-    val_every_n_epochs = 1
     checkpoint_callback = ModelCheckpoint(
+        auto_insert_metric_name=False,
         dirpath=output_directory,
-        every_n_epochs=val_every_n_epochs,
-        filename="{epoch}-{test_loss:.2f}",
-        monitor="test_loss",
+        every_n_train_steps=val_every_n_batches,
+        filename="epoch-{epoch}-step-{step}-loss-{test_loss:.3f}",
         save_top_k=-1,
     )
-    metrics_callback = MetricsCallback()
+    metrics_callback = MetricsCallback(
+        inputs_per_epoch=train_length,
+        steps_per_input=num_forecast_steps,
+    )
     kwargs = (
         {
             "limit_train_batches": train_length,
@@ -159,10 +166,10 @@ def train(
     )
     trainer = L.Trainer(
         callbacks=[checkpoint_callback, metrics_callback],
-        check_val_every_n_epoch=val_every_n_epochs,
         logger=False,
         max_epochs=num_epochs,
-        precision="bf16",
+        precision="bf16-mixed",
+        val_check_interval=val_every_n_batches,
         **kwargs,
     )
 
@@ -242,6 +249,12 @@ if __name__ == "__main__":
     )
     cmd_group.add_argument("--validate", action="store_true", help="Run validation")
     parser.add_argument("--batch-size", type=int, help="Batch size", default=2)
+    parser.add_argument(
+        "--batches-per-checkpoint",
+        type=int,
+        help="How many batches per checkpoint",
+        default=-1,
+    )
     parser.add_argument("--data-path", type=str, help="Path to the input data")
     parser.add_argument(
         "--hidden-channels-space",
@@ -311,6 +324,7 @@ if __name__ == "__main__":
         ]
         train(
             batch_size=args.batch_size,
+            batches_per_checkpoint=args.batches_per_checkpoint,
             hidden_channels_space=args.hidden_channels_space,
             hidden_channels_time=args.hidden_channels_time,
             max_batches=args.max_batches,
