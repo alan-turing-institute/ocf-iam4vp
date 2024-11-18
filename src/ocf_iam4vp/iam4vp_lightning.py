@@ -1,3 +1,5 @@
+import time
+
 import lightning as L
 import numpy as np
 import torch
@@ -138,8 +140,14 @@ class MetricsCallback(L.Callback):
         self.inputs_per_epoch = inputs_per_epoch
         self.metric_names = ("train_loss", "test_loss")
         self.steps_per_input = steps_per_input
+        self.start_time = time.perf_counter()
 
     def on_validation_end(self, trainer: L.Trainer, _) -> None:
+        # Reset the timer
+        elapsed = time.perf_counter() - self.start_time
+        self.start_time = time.perf_counter()
+
+        # Get values for existing metrics
         metrics = {}
         for metric in self.metric_names:
             if exists := trainer.callback_metrics.get(metric, None):
@@ -155,8 +163,9 @@ class MetricsCallback(L.Callback):
             int(trainer.global_step / self.steps_per_input)  # total inputs processed
             - trainer.current_epoch * self.inputs_per_epoch  # ... minus previous epochs
         )
+        rate = trainer.val_check_interval / elapsed
         tqdm.write(
-            f"Epoch {trainer.current_epoch}: Processed {n_inputs} / {self.inputs_per_epoch} inputs:"
+            f"Epoch {trainer.current_epoch}: Processed {n_inputs} / {self.inputs_per_epoch} inputs in {elapsed:.2f}s [{rate:.3f} it/s]"
         )
         if "train_loss" in metrics:
             tqdm.write(f"... mean training loss: {metrics['train_loss']:.4f}")
