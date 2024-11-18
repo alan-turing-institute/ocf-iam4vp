@@ -98,7 +98,7 @@ def train(
         sample_freq_mins=DATA_INTERVAL_SPACING_MINUTES,
         nan_to_num=True,
     )
-    print(f"Loaded {len(dataset)} steps of cloud coverage data.")
+    print(f"Loaded {len(dataset)} cloud coverage data entries.")
     test_length = min(val_every_n_batches, 0.2 * len(dataset))
     train_length = len(dataset) - test_length
     train_dataset, test_dataset = torch.utils.data.random_split(
@@ -128,7 +128,7 @@ def train(
     print("Data loaders will use:")
     worker_type = "persistent" if train_dataloader.num_workers > 0 else "ephemeral"
     print(f"... {train_dataloader.num_workers} {worker_type} workers")
-    print(f"... {train_dataloader.batch_size} batch_size")
+    print(f"... {train_dataloader.batch_size} entries per batch")
     print(f"... {'pinned' if train_dataloader.pin_memory else 'unpinned'} memory")
 
     # Create the model
@@ -163,7 +163,7 @@ def train(
     checkpoint_callback = ModelCheckpoint(
         auto_insert_metric_name=False,
         dirpath=output_directory,
-        every_n_train_steps=val_every_n_batches,
+        every_n_train_steps=val_every_n_batches * num_forecast_steps,
         filename="epoch-{epoch}-step-{step}-loss-{test_loss:.3f}",
         save_top_k=-1,
     )
