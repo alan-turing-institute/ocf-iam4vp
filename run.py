@@ -76,6 +76,7 @@ def train(
     num_forecast_steps: int,
     num_history_steps: int,
     output_directory: pathlib.Path,
+    resume_from_checkpoint: pathlib.Path | None,
     training_data_path: str | list[str],
     num_workers: int,
 ) -> None:
@@ -119,14 +120,25 @@ def train(
     )
 
     # Create the model
-    model = IAM4VPLightning(
-        (num_history_steps, NUM_CHANNELS, IMAGE_SIZE_TUPLE[0], IMAGE_SIZE_TUPLE[1]),
-        num_forecast_steps=num_forecast_steps,
-        hid_S=hidden_channels_space,
-        hid_T=hidden_channels_time,
-        N_S=num_convolutions_space,
-        N_T=num_convolutions_time,
-    )
+    if resume_from_checkpoint:
+        print("Loading model from checkpoint")
+        model = IAM4VPLightning.load_from_checkpoint(checkpoint_path)
+        assert model.hparams["hid_S"] == hidden_channels_space
+        assert model.hparams["hid_T"] == hidden_channels_time
+        assert model.hparams["N_S"] == num_convolutions_space
+        assert model.hparams["N_T"] == num_convolutions_time
+        assert model.hparams["num_forecast_steps"] == num_forecast_steps
+        assert model.hparams["shape_in"][0] == num_history_steps
+    else:
+        print("Creating model")
+        model = IAM4VPLightning(
+            (num_history_steps, NUM_CHANNELS, IMAGE_SIZE_TUPLE[0], IMAGE_SIZE_TUPLE[1]),
+            num_forecast_steps=num_forecast_steps,
+            hid_S=hidden_channels_space,
+            hid_T=hidden_channels_time,
+            N_S=num_convolutions_space,
+            N_T=num_convolutions_time,
+        )
 
     # Log parameters
     print("Training IAM4VP model")
@@ -281,6 +293,9 @@ if __name__ == "__main__":
     )
     parser.add_argument("--output-directory", type=str, help="Path to save outputs to")
     parser.add_argument(
+        "--resume-from-checkpoint", type=str, help="Path to a checkpoint file"
+    )
+    parser.add_argument(
         "--validate-config-file", type=str, help="Validation config file"
     )
     args = parser.parse_args()
@@ -302,6 +317,11 @@ if __name__ == "__main__":
         training_data_path = [
             str(path.resolve()) for path in pathlib.Path(args.data_path).glob("*.zarr")
         ]
+        checkpoint_path = (
+            pathlib.Path(args.resume_from_checkpoint)
+            if args.resume_from_checkpoint
+            else None
+        )
         train(
             batch_size=args.batch_size,
             batches_per_checkpoint=args.batches_per_checkpoint,
@@ -314,6 +334,7 @@ if __name__ == "__main__":
             num_history_steps=args.num_history_steps,
             num_workers=args.num_workers,
             output_directory=output_directory,
+            resume_from_checkpoint=checkpoint_path,
             training_data_path=training_data_path,
         )
     if args.summarise:
