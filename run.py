@@ -87,6 +87,7 @@ def train(
     val_every_n_batches = (
         batches_per_checkpoint if batches_per_checkpoint > 0 else len(dataset)
     )
+    print(f"Checkpoints will run every {val_every_n_batches} batches")
 
     # Load the training and test datasets
     dataset = SatelliteDataset(
