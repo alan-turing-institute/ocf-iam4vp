@@ -101,7 +101,9 @@ def train(
     print(f"Loaded {len(dataset)} steps of cloud coverage data.")
     test_length = min(val_every_n_batches, 0.2 * len(dataset))
     train_length = len(dataset) - test_length
-    train_dataset, test_dataset = torch.utils.data.random_split(dataset, (train_length, test_length))
+    train_dataset, test_dataset = torch.utils.data.random_split(
+        dataset, (train_length, test_length)
+    )
     print(f"  {train_length} will be used for training.")
     print(f"  {test_length} will be used for testing")
 
@@ -123,6 +125,11 @@ def train(
         persistent_workers=(num_workers > 0),
         pin_memory=True,
     )
+    print("Data loaders will use:")
+    worker_type = "persistent" if train_dataloader.num_workers > 0 else "ephemeral"
+    print(f"... {train_dataloader.num_workers} {worker_type} workers")
+    print(f"... {train_dataloader.batch_size} batch_size")
+    print(f"... {'pinned' if train_dataloader.pin_memory else 'unpinned'} memory")
 
     # Create the model
     if resume_from_checkpoint:
