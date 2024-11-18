@@ -49,8 +49,8 @@ def summarise(
     # Create some random inputs
     batch_X = torch.randn(
         batch_size,
-        num_history_steps,
         NUM_CHANNELS,
+        num_history_steps,
         IMAGE_SIZE_TUPLE[0],
         IMAGE_SIZE_TUPLE[1],
     )
@@ -62,7 +62,7 @@ def summarise(
     print(f"- num-convolutions-time: {num_convolutions_time}")
     print(f"- num-forecast-steps: {num_forecast_steps}")
     print(f"- num-history-steps: {num_history_steps}")
-    summary(model, input_data=(batch_X, [], None), device=device)
+    summary(model, input_data=(batch_X, []), device=device)
 
 
 def train(
@@ -256,13 +256,13 @@ if __name__ == "__main__":
         "--hidden-channels-space",
         type=int,
         help="Number of spatial hidden channels",
-        default=64,
+        default=32,
     )
     parser.add_argument(
         "--hidden-channels-time",
         type=int,
         help="Number of temporal hidden channels",
-        default=512,
+        default=64,
     )
     parser.add_argument(
         "--num-convolutions-space",
@@ -274,14 +274,14 @@ if __name__ == "__main__":
         "--num-convolutions-time",
         type=int,
         help="Number of temporal convolutions",
-        default=6,
+        default=4,
     )
     parser.add_argument("--num-epochs", type=int, help="Number of epochs", default=10)
     parser.add_argument(
         "--num-forecast-steps",
         type=int,
         help="Forecast steps used to mitigate error accumulation",
-        default=10,
+        default=12,
     )
     parser.add_argument(
         "--num-history-steps", type=int, help="History steps", default=24
