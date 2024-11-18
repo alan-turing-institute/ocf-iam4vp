@@ -61,6 +61,7 @@ class IAM4VPLightning(L.LightningModule):
         self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
         # Split the batch into X and y
+        self.log("batch_idx", batch_idx + 1)  # counting starts from 0
         batch_X, batch_y = batch
 
         # Get optimizers
@@ -165,7 +166,7 @@ class MetricsCallback(L.Callback):
         )
         rate = trainer.val_check_interval / elapsed
         tqdm.write(
-            f"Epoch {trainer.current_epoch}: Processed {n_inputs} / {self.inputs_per_epoch} inputs in {elapsed:.2f}s [{rate:.3f} it/s]"
+            f"Epoch {trainer.current_epoch}: Processed {n_inputs} / {self.inputs_per_epoch} inputs in {elapsed:.1f}s [{rate:.3f} it/s]"
         )
         if "train_loss" in metrics:
             tqdm.write(f"... mean training loss: {metrics['train_loss']:.4f}")

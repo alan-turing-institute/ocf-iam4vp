@@ -99,7 +99,7 @@ def train(
         nan_to_num=True,
     )
     print(f"Loaded {len(dataset)} cloud coverage data entries.")
-    test_length = min(val_every_n_batches, 0.2 * len(dataset))
+    test_length = min(2 * val_every_n_batches, 0.2 * len(dataset))
     train_length = len(dataset) - test_length
     train_dataset, test_dataset = torch.utils.data.random_split(
         dataset, (train_length, test_length)
@@ -157,14 +157,11 @@ def train(
     model.describe({"output_directory": output_directory})
 
     # Initialise the trainer
-    val_every_n_batches = (
-        batches_per_checkpoint if batches_per_checkpoint > 0 else train_length
-    )
     checkpoint_callback = ModelCheckpoint(
         auto_insert_metric_name=False,
         dirpath=output_directory,
-        every_n_train_steps=val_every_n_batches * num_forecast_steps,
-        filename="epoch-{epoch}-step-{step}-loss-{test_loss:.3f}",
+        filename="epoch-{epoch}-batch-{batch_idx:.0f}-loss-{test_loss:.4f}",
+        save_on_train_epoch_end=False,  # this will save after every validation step
         save_top_k=-1,
     )
     metrics_callback = MetricsCallback(
@@ -172,7 +169,7 @@ def train(
         steps_per_input=num_forecast_steps,
     )
     trainer = L.Trainer(
-        callbacks=[checkpoint_callback, metrics_callback],
+        callbacks=[metrics_callback, checkpoint_callback],
         logger=False,
         max_epochs=num_epochs,
         precision="bf16-mixed",
