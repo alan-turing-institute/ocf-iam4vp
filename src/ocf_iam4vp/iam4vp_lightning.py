@@ -166,16 +166,16 @@ class MetricsCallback(L.Callback):
         )
         rate = trainer.val_check_interval / elapsed
         tqdm.write(
-            f"Epoch {trainer.current_epoch}: Processed {n_inputs} / {self.batches_per_epoch} batches in {elapsed:.1f}s [{rate:.3f} it/s]"
+            f"Epoch {trainer.current_epoch}: "
+            f"Processed {n_inputs}/{self.batches_per_epoch} batches "
+            f"in {tqdm.format_interval(elapsed)} [{rate:.3f}it/s]"
         )
         if "train_loss" in metrics:
             tqdm.write(f"... mean training loss: {metrics['train_loss']:.4f}")
         if "test_loss" in metrics:
             tqdm.write(f"... mean testing loss: {metrics['test_loss']:.4f}")
             if metrics["test_loss"] < self.best_test_loss:
-                tqdm.write(
-                    f"... testing loss improvement: {self.best_test_loss - metrics['test_loss']:.4f}"
-                )
+                tqdm.write("... ✨ best testing loss so far ✨")
                 self.best_test_loss = metrics["test_loss"]
 
 

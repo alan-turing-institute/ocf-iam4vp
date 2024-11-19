@@ -161,8 +161,10 @@ def train(
         auto_insert_metric_name=False,
         dirpath=output_directory,
         filename="epoch-{epoch}-batch-{batch_idx:.0f}-loss-{test_loss:.4f}",
+        monitor="test_loss",
+        mode="min",
         save_on_train_epoch_end=False,  # this will save after every validation step
-        save_top_k=-1,
+        save_top_k=3,
     )
     metrics_callback = MetricsCallback(
         batches_per_epoch=len(train_dataloader),
