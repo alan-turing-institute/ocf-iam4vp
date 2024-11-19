@@ -125,7 +125,7 @@ class IAM4VPLightning(L.LightningModule):
         return self.model.predict(batch[0])
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(self.model.parameters(), lr=1e-4)
+        optimizer = optim.AdamW(self.model.parameters(), lr=1e-3)
         return optimizer
 
     def loss(self, y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
