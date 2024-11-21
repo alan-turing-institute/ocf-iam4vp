@@ -23,7 +23,7 @@ class IAM4VPCloudcaster(AbstractModel):
         )
         num_history_steps = self.model.hparams["shape_in"][0]
         num_training_epochs = int(
-            re.search(r"epoch=(\d+)-test_loss.*", checkpoint_path).group(1)
+            re.search(r"epoch-(\d+)-batch-\d+-loss.*", checkpoint_path).group(1)
         )
 
         # All models must include `history_steps` as a parameter. This is the number of
