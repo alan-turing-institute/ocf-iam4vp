@@ -83,13 +83,7 @@ def train(
     # Set random seeds
     L.seed_everything(42, workers=True)
 
-    # How often to run validation
-    val_every_n_batches = (
-        batches_per_checkpoint if batches_per_checkpoint > 0 else len(dataset)
-    )
-    print(f"Checkpoints will run every {val_every_n_batches} batches")
-
-    # Load the training and test datasets
+    # Load the data used to train and test the model
     dataset = SatelliteDataset(
         zarr_path=training_data_path,
         start_time=None,
@@ -99,14 +93,24 @@ def train(
         sample_freq_mins=DATA_INTERVAL_SPACING_MINUTES,
         nan_to_num=True,
     )
+    n_batches = int(len(dataset) / batch_size)
     print(f"Loaded {len(dataset)} cloud coverage data entries.")
+    print(f"... these will be grouped into {n_batches} batches.")
+
+    # Divide into training and test datasets
+    val_every_n_batches = (
+        batches_per_checkpoint if batches_per_checkpoint > 0 else n_batches
+    )
     test_length = min(2 * val_every_n_batches, 0.2 * len(dataset))
     train_length = len(dataset) - test_length
     train_dataset, test_dataset = torch.utils.data.random_split(
         dataset, (train_length, test_length)
     )
-    print(f"... {train_length} will be used for training.")
-    print(f"... {test_length} will be used for testing")
+    print(
+        f"... {int(len(train_dataset) / batch_size)} batches will be used for training."
+    )
+    print(f"    ... with checkpoints run after each {val_every_n_batches} batches")
+    print(f"... {int(len(test_dataset) / batch_size)} batches will be used for testing")
 
     # Construct appropriate data loaders
     train_dataloader = DataLoader(
