@@ -9,6 +9,8 @@ from tqdm import tqdm
 
 from .iam4vp import IAM4VP
 
+LightningBatch = tuple[torch.Tensor, torch.Tensor]
+
 
 class IAM4VPLightning(L.LightningModule):
     """
@@ -57,9 +59,7 @@ class IAM4VPLightning(L.LightningModule):
         for key, value in extra_values.items():
             print(f"... {key} {value}")
 
-    def training_step(
-        self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int
-    ) -> torch.Tensor:
+    def training_step(self, batch: LightningBatch, batch_idx: int) -> torch.Tensor:
         # Split the batch into X and y
         self.log("batch_idx", batch_idx + 1)  # counting starts from 0
         batch_X, batch_y = batch
@@ -101,9 +101,7 @@ class IAM4VPLightning(L.LightningModule):
         self.log("train_loss", loss)
         return loss
 
-    def validation_step(
-        self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int
-    ) -> torch.Tensor:
+    def validation_step(self, batch: LightningBatch, batch_idx: int) -> torch.Tensor:
         # Split the batch into X and y
         batch_X, batch_y = batch
 
@@ -117,7 +115,7 @@ class IAM4VPLightning(L.LightningModule):
 
     def predict_step(
         self,
-        batch: tuple[torch.Tensor, torch.Tensor],
+        batch: LightningBatch,
         batch_idx: int,
         dataloader_idx: int = 0,
     ) -> torch.Tensor:
@@ -242,14 +240,14 @@ class PlottingCallback(L.Callback):
         trainer: L.Trainer,
         model: L.LightningModule,
         predicted_outputs: torch.Tensor,
-        batch_inputs: tuple[torch.Tensor, torch.Tensor],
+        batch: LightningBatch,
         batch_idx: int,
         dataloader_idx: int = 0,
     ) -> None:
         """Called when the predict batch ends."""
         if batch_idx % self.every_n_batches == 0:
             tqdm.write(f"Plotting outputs for batch {batch_idx}")
-            y = batch_inputs[1].cpu().detach().numpy()
+            y = batch[1].cpu().detach().numpy()
             y_hat = predicted_outputs.cpu().detach().numpy()
 
             # Plot channels for timestep 1
