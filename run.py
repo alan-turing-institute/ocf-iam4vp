@@ -15,7 +15,13 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
 from torchinfo import summary
 
-from ocf_iam4vp import IAM4VP, IAM4VPLightning, MetricsCallback, PlottingCallback
+from ocf_iam4vp import (
+    IAM4VP,
+    EarlyEpochStopping,
+    IAM4VPLightning,
+    MetricsLogger,
+    PlottingCallback,
+)
 
 
 def summarise(
@@ -160,22 +166,28 @@ def train(
     # Log parameters
     model.describe({"output_directory": output_directory})
 
-    # Initialise the trainer
+    # Set callbacks
     checkpoint_callback = ModelCheckpoint(
         auto_insert_metric_name=False,
         dirpath=output_directory,
         filename="epoch-{epoch}-batch-{batch_idx:.0f}-loss-{test_loss:.4f}",
         monitor="test_loss",
         mode="min",
-        save_on_train_epoch_end=False,  # this will save after every validation step
+        save_on_train_epoch_end=False,  # save after every validation step
         save_top_k=3,
     )
-    metrics_callback = MetricsCallback(
-        batches_per_epoch=len(train_dataloader),
-        steps_per_batch=num_forecast_steps,
+    early_stopping_callback = EarlyEpochStopping(
+        check_on_train_epoch_end=False,  # check after every validation step
+        min_delta=0.001,
+        monitor="test_loss",
+        mode="min",
+        patience=3,
     )
+    metrics_callback = MetricsLogger()
+
+    # Initialise the trainer
     trainer = L.Trainer(
-        callbacks=[metrics_callback, checkpoint_callback],
+        callbacks=[metrics_callback, checkpoint_callback, early_stopping_callback],
         logger=False,
         max_epochs=num_epochs,
         precision="bf16-mixed",

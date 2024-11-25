@@ -1,9 +1,11 @@
 import time
+from typing import Any
 
 import lightning as L
 import numpy as np
 import torch
 import torch.optim as optim
+from lightning.pytorch.callbacks import EarlyStopping
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
@@ -48,6 +50,8 @@ class IAM4VPLightning(L.LightningModule):
         # This means that we have make the backward pass and optimizer calls explicit
         self.automatic_optimization = False
         torch.set_float32_matmul_precision("medium")
+        # Set this attribute to stop the epoch early
+        self.stop_epoch = False
 
     def describe(self, extra_values: dict[str, str] = {}) -> None:
         print(f"... hidden_channels_space {self.hparams['hid_S']}")
@@ -58,6 +62,11 @@ class IAM4VPLightning(L.LightningModule):
         print(f"... num_history_steps {self.hparams['shape_in'][0]}")
         for key, value in extra_values.items():
             print(f"... {key} {value}")
+
+    def on_train_batch_start(self, batch: LightningBatch, batch_idx: int) -> int | None:
+        if self.stop_epoch:
+            self.stop_epoch = False
+            return -1
 
     def training_step(self, batch: LightningBatch, batch_idx: int) -> torch.Tensor:
         # Split the batch into X and y
@@ -130,16 +139,67 @@ class IAM4VPLightning(L.LightningModule):
         return torch.nanmean(torch.nn.functional.l1_loss(y_hat, y, reduction="none"))
 
 
-class MetricsCallback(L.Callback):
+class EarlyEpochStopping(EarlyStopping):
+    """PyTorch Lightning epoch stopping callback."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.reason = ""
+        self.stop_epoch = False
+
+    def reset(self):
+        self.best_score = (
+            torch.tensor(torch.inf)
+            if self.monitor_op == torch.lt
+            else -torch.tensor(torch.inf)
+        )
+        self.stop_epoch = False
+
+    def on_train_batch_start(
+        self,
+        trainer: L.Trainer,
+        pl_module: L.LightningModule,
+        batch: LightningBatch,
+        batch_idx: int,
+    ) -> None:
+        if self.stop_epoch:
+            tqdm.write(f"Stopping epoch {trainer.current_epoch} early. {self.reason}")
+            pl_module.stop_epoch = True
+            self.reset()
+
+    def _run_early_stopping_check(self, trainer: L.Trainer) -> None:
+        logs = trainer.callback_metrics
+        current = logs[self.monitor].squeeze()
+        should_stop, reason = self._evaluate_stopping_criteria(current)
+        self.stop_epoch = self.stop_epoch or should_stop
+        self.reason = (
+            (reason if reason else "").replace("Signaling Trainer to stop.", "").strip()
+        )
+
+
+class MetricsLogger(L.Callback):
     """PyTorch Lightning metric callback."""
 
-    def __init__(self, batches_per_epoch: int, steps_per_batch: int) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.batches_per_epoch = batches_per_epoch
         self.best_test_loss = torch.inf
         self.metric_names = ("train_loss", "test_loss")
         self.start_time = time.perf_counter()
-        self.steps_per_batch = steps_per_batch
+        self.n_batches_this_epoch = 0
+
+    def on_train_epoch_start(
+        self, trainer: L.Trainer, pl_module: L.LightningModule
+    ) -> None:
+        self.n_batches_this_epoch = 0
+
+    def on_train_batch_start(
+        self,
+        trainer: L.Trainer,
+        pl_module: L.LightningModule,
+        batch: LightningBatch,
+        batch_idx: int,
+    ) -> None:
+        self.n_batches_this_epoch += 1
 
     def on_validation_end(self, trainer: L.Trainer, _) -> None:
         # Reset the timer
@@ -158,14 +218,10 @@ class MetricsCallback(L.Callback):
             self.best_test_loss = metrics["test_loss"]
             return
 
-        n_inputs = (
-            int(trainer.global_step / self.steps_per_batch)  # total inputs processed
-            - trainer.current_epoch * self.batches_per_epoch  # minus previous epochs
-        )
         rate = trainer.val_check_interval / elapsed
         tqdm.write(
             f"Epoch {trainer.current_epoch}: "
-            f"Processed {n_inputs}/{self.batches_per_epoch} batches "
+            f"Processed {self.n_batches_this_epoch} batches "
             f"in {tqdm.format_interval(elapsed)} [{rate:.3f}it/s]"
         )
         if "train_loss" in metrics:
