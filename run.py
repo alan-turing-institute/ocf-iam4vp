@@ -167,7 +167,7 @@ def train(
     model.describe({"output_directory": output_directory})
 
     # Set callbacks
-    checkpoint_callback = ModelCheckpoint(
+    batch_checkpoint_callback = ModelCheckpoint(
         auto_insert_metric_name=False,
         dirpath=output_directory,
         filename="epoch-{epoch}-batch-{batch_idx:.0f}-loss-{test_loss:.4f}",
@@ -176,18 +176,29 @@ def train(
         save_on_train_epoch_end=False,  # save after every validation step
         save_top_k=3,
     )
+    epoch_checkpoint_callback = ModelCheckpoint(
+        auto_insert_metric_name=False,
+        dirpath=output_directory,
+        filename="epoch-{epoch}-loss-{test_loss:.4f}",
+        save_on_train_epoch_end=True,  # check after every training epoch
+    )
     early_stopping_callback = EarlyEpochStopping(
         check_on_train_epoch_end=False,  # check after every validation step
-        min_delta=0.001,
+        min_delta=0.0005,
         monitor="test_loss",
         mode="min",
         patience=3,
     )
-    metrics_callback = MetricsLogger()
+    metric_logging_callback = MetricsLogger()
 
     # Initialise the trainer
     trainer = L.Trainer(
-        callbacks=[metrics_callback, checkpoint_callback, early_stopping_callback],
+        callbacks=[
+            metric_logging_callback,
+            batch_checkpoint_callback,
+            epoch_checkpoint_callback,
+            early_stopping_callback,
+        ],
         logger=False,
         max_epochs=num_epochs,
         precision="bf16-mixed",

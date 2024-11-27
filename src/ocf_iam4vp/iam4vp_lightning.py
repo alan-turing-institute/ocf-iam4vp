@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import torch.optim as optim
 from lightning.pytorch.callbacks import EarlyStopping
+from lightning.pytorch.utilities.types import OptimizerLRScheduler
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
@@ -128,12 +129,10 @@ class IAM4VPLightning(L.LightningModule):
         batch_idx: int,
         dataloader_idx: int = 0,
     ) -> torch.Tensor:
-        batch_X, _ = batch
         return self.model.predict(batch[0])
 
-    def configure_optimizers(self):
-        optimizer = optim.AdamW(self.model.parameters(), lr=1e-3)
-        return optimizer
+    def configure_optimizers(self) -> OptimizerLRScheduler:
+        return optim.AdamW(self.model.parameters(), lr=0.001)
 
     def loss(self, y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         return torch.nanmean(torch.nn.functional.l1_loss(y_hat, y, reduction="none"))
@@ -147,14 +146,6 @@ class EarlyEpochStopping(EarlyStopping):
         self.reason = ""
         self.stop_epoch = False
 
-    def reset(self):
-        self.best_score = (
-            torch.tensor(torch.inf)
-            if self.monitor_op == torch.lt
-            else -torch.tensor(torch.inf)
-        )
-        self.stop_epoch = False
-
     def on_train_batch_start(
         self,
         trainer: L.Trainer,
@@ -165,7 +156,17 @@ class EarlyEpochStopping(EarlyStopping):
         if self.stop_epoch:
             tqdm.write(f"Stopping epoch {trainer.current_epoch} early. {self.reason}")
             pl_module.stop_epoch = True
-            self.reset()
+
+    def on_train_epoch_start(
+        self, trainer: L.Trainer, pl_module: L.LightningModule
+    ) -> None:
+        self.best_score = (
+            torch.tensor(torch.inf)
+            if self.monitor_op == torch.lt
+            else -torch.tensor(torch.inf)
+        )
+        self.stop_epoch = False
+        self.wait_count = 0
 
     def _run_early_stopping_check(self, trainer: L.Trainer) -> None:
         logs = trainer.callback_metrics
