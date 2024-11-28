@@ -191,6 +191,14 @@ def train(
     )
     metric_logging_callback = MetricsLogger()
 
+    # List the callback settings
+    print("Epoch will terminate early if:")
+    print(
+        f"... {early_stopping_callback.monitor} improves by less than"
+        f" {abs(early_stopping_callback.min_delta)} for"
+        f" {early_stopping_callback.patience} consecutive test steps."
+    )
+
     # Initialise the trainer
     trainer = L.Trainer(
         callbacks=[
