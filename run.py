@@ -115,7 +115,7 @@ def train(
     print(
         f"... {int(len(train_dataset) / batch_size)} batches will be used for training."
     )
-    print(f"    ... with checkpoints run after each {val_every_n_batches} batches")
+    print(f"    with testing run after each {val_every_n_batches} batches")
     print(f"... {int(len(test_dataset) / batch_size)} batches will be used for testing")
 
     # Construct appropriate data loaders
@@ -205,6 +205,13 @@ def train(
         val_check_interval=val_every_n_batches,
     )
 
+    # Examine the data
+    batch_X, _ = next(iter(train_dataloader))
+    print("Training data has:")
+    print(f"... {batch_X.shape[1]} channels")
+    print(f"... {batch_X.shape[3]} pixels (height)")
+    print(f"... {batch_X.shape[4]} pixels (width)")
+
     # Perform training and validation
     print("Start training IAM4VP model")
     trainer.fit(
@@ -255,6 +262,13 @@ def validate(
         persistent_workers=(num_workers > 0),
         shuffle=False,
     )
+
+    # Examine the data
+    batch_X, _ = next(iter(valid_dataloader))
+    print("Validation data has:")
+    print(f"... {batch_X.shape[1]} channels")
+    print(f"... {batch_X.shape[3]} pixels (height)")
+    print(f"... {batch_X.shape[4]} pixels (width)")
 
     # Initialise the predictor and plot outputs
     plotting_callback = PlottingCallback(
