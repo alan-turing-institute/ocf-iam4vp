@@ -173,6 +173,8 @@ class IAM4VP(nn.Module):
     - Sigmoid normalisation to range (0, 1)
 
     Parameters:
+    - num_channels [int]: number of input channels
+    - num_history_steps [int]: number of historical input steps
     - num_forecast_steps [int]: number of steps to forecast
     - hid_S [int]: number of spatial hidden channels
     - hid_T [int]: number of temporal hidden channels
@@ -182,7 +184,8 @@ class IAM4VP(nn.Module):
 
     def __init__(
         self,
-        shape_in: torch.Size,
+        num_channels: int,
+        num_history_steps: int,
         num_forecast_steps: int = 12,
         hid_S: int = 64,
         hid_T: int = 512,
@@ -190,16 +193,12 @@ class IAM4VP(nn.Module):
         N_T: int = 6,
     ):
         super().__init__()
-        T, C, H, W = shape_in
         self.num_forecast_steps = num_forecast_steps
         self.time_mlp = TimeMLP(dim=hid_S)
-        self.enc = Encoder(C, hid_S, N_S)
-        self.hid = Predictor(T, hid_S, hid_T, N_T)
-        self.dec = Decoder(hid_S, C, N_S)
-        self.future_latent = nn.Parameter(
-            torch.zeros_like(self.enc(torch.randn(shape_in))[0])
-        )
-        self.str = SpatioTemporalRefinement(C, T)
+        self.enc = Encoder(num_channels, hid_S, N_S)
+        self.hid = Predictor(num_history_steps, hid_S, hid_T, N_T)
+        self.dec = Decoder(hid_S, num_channels, N_S)
+        self.str = SpatioTemporalRefinement(num_channels, num_history_steps)
         self.norm = torch.nn.Sigmoid()
 
     def forward(
@@ -226,7 +225,7 @@ class IAM4VP(nn.Module):
         _, C_, H_, W_ = embed.shape
 
         # Encode future frames to latent space, padding with zeros
-        future_latent = self.future_latent.repeat(B, 1, 1, 1, 1)
+        future_latent = torch.zeros(B, T, C_, H_, W_, device=x_raw.device)
         for idx, pred in enumerate(y_raw):
             pred_embed, _ = self.enc(pred)
             future_latent[:, idx, :, :, :] = pred_embed

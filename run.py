@@ -42,7 +42,8 @@ def summarise(
 
     # Create the model
     model = IAM4VP(
-        (num_history_steps, NUM_CHANNELS, IMAGE_SIZE_TUPLE[0], IMAGE_SIZE_TUPLE[1]),
+        num_channels=NUM_CHANNELS,
+        num_history_steps=num_history_steps,
         num_forecast_steps=num_forecast_steps,
         hid_S=hidden_channels_space,
         hid_T=hidden_channels_time,
@@ -165,7 +166,8 @@ def train(
     else:
         print("Creating IAM4VP model")
         model = IAM4VPLightning(
-            (T_in, C_in, H_in, W_in),
+            num_channels=C_in,
+            num_history_steps=num_history_steps,
             num_forecast_steps=num_forecast_steps,
             hid_S=hidden_channels_space,
             hid_T=hidden_channels_time,

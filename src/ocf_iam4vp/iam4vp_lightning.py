@@ -37,7 +37,8 @@ class IAM4VPLightning(L.LightningModule):
 
     def __init__(
         self,
-        shape_in: torch.Size,
+        num_channels: int,
+        num_history_steps: int,
         num_forecast_steps: int = 12,
         hid_S: int = 64,
         hid_T: int = 512,
@@ -46,7 +47,9 @@ class IAM4VPLightning(L.LightningModule):
     ):
         super().__init__()
         self.save_hyperparameters()
-        self.model = IAM4VP(shape_in, num_forecast_steps, hid_S, hid_T, N_S, N_T)
+        self.model = IAM4VP(
+            num_channels, num_history_steps, num_forecast_steps, hid_S, hid_T, N_S, N_T
+        )
         # Enable manual optimisation to reduce memory usage in the forecast loop
         # This means that we have make the backward pass and optimizer calls explicit
         self.automatic_optimization = False
@@ -60,7 +63,7 @@ class IAM4VPLightning(L.LightningModule):
         print(f"... num_convolutions_space {self.hparams['N_S']}")
         print(f"... num_convolutions_time {self.hparams['N_T']}")
         print(f"... num_forecast_steps {self.hparams['num_forecast_steps']}")
-        print(f"... num_history_steps {self.hparams['shape_in'][0]}")
+        print(f"... num_history_steps {self.hparams['num_history_steps']}")
         for key, value in extra_values.items():
             print(f"... {key} {value}")
 
