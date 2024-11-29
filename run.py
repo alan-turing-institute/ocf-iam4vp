@@ -142,6 +142,16 @@ def train(
     print(f"... {train_dataloader.batch_size} entries per batch")
     print(f"... {'pinned' if train_dataloader.pin_memory else 'unpinned'} memory")
 
+    # Examine the data
+    batch_X, _ = next(iter(train_dataloader))
+    B_in, C_in, T_in, H_in, W_in = batch_X.shape
+    print("Training data has:")
+    print(f"... {C_in} channels")
+    print(f"... {H_in} pixels (height)")
+    print(f"... {W_in} pixels (width)")
+    assert B_in == batch_size
+    assert T_in == num_history_steps
+
     # Create the model
     if resume_from_checkpoint:
         print("Loading IAM4VP model from checkpoint")
@@ -155,7 +165,7 @@ def train(
     else:
         print("Creating IAM4VP model")
         model = IAM4VPLightning(
-            (num_history_steps, NUM_CHANNELS, IMAGE_SIZE_TUPLE[0], IMAGE_SIZE_TUPLE[1]),
+            (T_in, C_in, H_in, W_in),
             num_forecast_steps=num_forecast_steps,
             hid_S=hidden_channels_space,
             hid_T=hidden_channels_time,
@@ -212,13 +222,6 @@ def train(
         precision="bf16-mixed",
         val_check_interval=val_every_n_batches,
     )
-
-    # Examine the data
-    batch_X, _ = next(iter(train_dataloader))
-    print("Training data has:")
-    print(f"... {batch_X.shape[1]} channels")
-    print(f"... {batch_X.shape[3]} pixels (height)")
-    print(f"... {batch_X.shape[4]} pixels (width)")
 
     # Perform training and validation
     print("Start training IAM4VP model")
