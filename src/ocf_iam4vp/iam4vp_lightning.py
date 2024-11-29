@@ -132,7 +132,7 @@ class IAM4VPLightning(L.LightningModule):
         return self.model.predict(batch[0])
 
     def configure_optimizers(self) -> OptimizerLRScheduler:
-        return optim.AdamW(self.model.parameters(), lr=0.001)
+        return optim.AdamW(self.model.parameters(), lr=1e-4)
 
     def loss(self, y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         return torch.nanmean(torch.nn.functional.l1_loss(y_hat, y, reduction="none"))
