@@ -1,12 +1,12 @@
 model:
   name: "IAM4VPCloudcaster"
   params:
-    checkpoint_path: /bask/projects/v/vjgo8416-climate/users/saoq4015/models/iam4vp/0.4.0/best/epoch-1-loss-0.123.ckpt
-    version: "0.4.0"
+    checkpoint_path: /bask/projects/v/vjgo8416-climate/users/saoq4015/models/iam4vp/0.4.1/best/epoch-1-loss-0.123.ckpt
+    version: "0.4.1"
 validation:
   data_path: "/bask/projects/v/vjgo8416-climate/shared/data/eumetsat/testing2022/2022_test_nonhrv.zarr"
   wandb_project_name: "cloudcasting"
-  wandb_run_name: "IAM4VP-0.4.0-epoch-1"
+  wandb_run_name: "IAM4VP-0.4.1-epoch-1"
   nan_to_num: False
   batch_size: 2
   num_workers: 0
