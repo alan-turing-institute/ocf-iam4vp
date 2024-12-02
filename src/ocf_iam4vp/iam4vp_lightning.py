@@ -53,6 +53,7 @@ class IAM4VPLightning(L.LightningModule):
         # Enable manual optimisation to reduce memory usage in the forecast loop
         # This means that we have make the backward pass and optimizer calls explicit
         self.automatic_optimization = False
+        # Reduce precision to take advantage of hardware optimisations
         torch.set_float32_matmul_precision("medium")
         # Set this attribute to stop the epoch early
         self.stop_epoch = False
@@ -137,8 +138,29 @@ class IAM4VPLightning(L.LightningModule):
     def configure_optimizers(self) -> OptimizerLRScheduler:
         return optim.AdamW(self.model.parameters(), lr=1e-4)
 
-    def loss(self, y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        return torch.nanmean(torch.nn.functional.l1_loss(y_hat, y, reduction="none"))
+    def loss(
+        self,
+        y_hat: torch.Tensor,
+        y: torch.Tensor,
+        *,
+        alpha: int = 2,
+        lambda_gdl: int = 0,
+        lambda_mae: int = 1,
+    ) -> torch.Tensor:
+        # Mean absolute error
+        loss_mae = torch.nanmean(
+            torch.nn.functional.l1_loss(y_hat, y, reduction="none")
+        )
+
+        # Gradient difference loss from https://arxiv.org/abs/1511.05440
+        loss_gdl = torch.nanmean(
+            (y_hat.diff(axis=-2).abs_() - y.diff(axis=-2).abs_()).pow(alpha)
+        ) + torch.nanmean(
+            (y_hat.diff(axis=-1).abs_() - y.diff(axis=-1).abs_()).pow(alpha)
+        )
+
+        # Return combination of two losses
+        return lambda_gdl * loss_gdl + lambda_mae * loss_mae
 
 
 class EarlyEpochStopping(EarlyStopping):

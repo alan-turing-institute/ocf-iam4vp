@@ -237,7 +237,9 @@ class IAM4VP(nn.Module):
         del context_latent, future_latent, embed
 
         # Construct time embedding from a uniformly-filled tensor
-        time_emb = self.time_mlp(torch.tensor(100 * len(y_raw)).repeat(B).to(x.device))
+        time_emb = self.time_mlp(
+            torch.tensor(100 * len(y_raw), device=x.device).repeat(B)
+        )
 
         # Run predictor on combined latent data + time embedding
         Y = self.hid(combined_latent, time_emb)
