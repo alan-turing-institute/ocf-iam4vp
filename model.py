@@ -21,7 +21,7 @@ class IAM4VPCloudcaster(AbstractModel):
         self.model = IAM4VPLightning.load_from_checkpoint(
             checkpoint_path, num_forecast_steps=NUM_FORECAST_STEPS
         )
-        num_history_steps = self.model.hparams["shape_in"][0]
+        num_history_steps = self.model.hparams["num_history_steps"]
         num_training_epochs = int(
             re.search(r"epoch-(\d+)-batch-\d+-loss.*", checkpoint_path).group(1)
         )

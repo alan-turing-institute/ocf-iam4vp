@@ -161,8 +161,9 @@ def train(
         assert model.hparams["hid_T"] == hidden_channels_time
         assert model.hparams["N_S"] == num_convolutions_space
         assert model.hparams["N_T"] == num_convolutions_time
+        assert model.hparams["num_channels"] == C_in
         assert model.hparams["num_forecast_steps"] == num_forecast_steps
-        assert model.hparams["shape_in"][0] == num_history_steps
+        assert model.hparams["num_history_steps"] == num_history_steps
     else:
         print("Creating IAM4VP model")
         model = IAM4VPLightning(
