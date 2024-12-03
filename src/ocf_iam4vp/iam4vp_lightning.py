@@ -83,7 +83,8 @@ class IAM4VPLightning(L.LightningModule):
 
         # Prepare prediction and loss lists
         y_hats: list[torch.Tensor] = []
-        losses: list[float] = []
+        losses: list[torch.Tensor] = []
+        loss_ratios: list[float] = []
 
         # Zero the parameter gradients
         optimizers.zero_grad()
@@ -95,13 +96,14 @@ class IAM4VPLightning(L.LightningModule):
             y_hat = self.model(batch_X, y_hats)
 
             # Calculate the loss
-            loss = self.loss(y_hat, batch_y[:, :, idx_forecast, :, :])
+            loss, loss_ratio = self.loss(y_hat, batch_y[:, :, idx_forecast, :, :])
 
             # Backward pass and optimize
             self.manual_backward(loss)
 
             # Keep track of loss values
             losses.append(loss.detach())
+            loss_ratios.append(loss_ratio)
             del loss
 
             # Detach latest prediction to save memory before adding it to the queue
@@ -115,7 +117,9 @@ class IAM4VPLightning(L.LightningModule):
 
         # Calculate mean loss for the full set of forecasts
         loss = torch.stack(losses).mean()
+        loss_ratio = sum(loss_ratios) / len(loss_ratios)
         self.log("train_loss", loss)
+        self.log("train_loss_ratio", loss_ratio)
         return loss
 
     def validation_step(self, batch: LightningBatch, batch_idx: int) -> torch.Tensor:
@@ -126,8 +130,9 @@ class IAM4VPLightning(L.LightningModule):
         batch_y_hat = self.model.predict(batch_X)
 
         # Calculate loss
-        loss = self.loss(batch_y_hat, batch_y)
+        loss, loss_ratio = self.loss(batch_y_hat, batch_y)
         self.log("test_loss", loss)
+        self.log("test_loss_ratio", loss_ratio)
         return loss
 
     def predict_step(
@@ -163,7 +168,8 @@ class IAM4VPLightning(L.LightningModule):
         )
 
         # Return combination of two losses
-        return lambda_gdl * loss_gdl + lambda_mae * loss_mae
+        loss_ratio = loss_mae.item() / loss_gdl.item()
+        return lambda_gdl * loss_gdl + lambda_mae * loss_mae, loss_ratio
 
 
 class EarlyEpochStopping(EarlyStopping):
@@ -212,7 +218,12 @@ class MetricsLogger(L.Callback):
     def __init__(self) -> None:
         super().__init__()
         self.best_test_loss = torch.inf
-        self.metric_names = ("train_loss", "test_loss")
+        self.metric_names = (
+            "test_loss_ratio",
+            "test_loss",
+            "train_loss_ratio",
+            "train_loss",
+        )
         self.start_time = time.perf_counter()
         self.n_batches_this_epoch = 0
 
@@ -243,7 +254,7 @@ class MetricsLogger(L.Callback):
 
         # The first test run will be done before training
         if "train_loss" not in metrics:
-            tqdm.write(f"... mean (untrained) testing loss: {metrics['test_loss']:.4f}")
+            tqdm.write(f"... mean (untrained) testing loss: {metrics['test_loss']:.5f}")
             self.best_test_loss = metrics["test_loss"]
             return
 
@@ -254,9 +265,13 @@ class MetricsLogger(L.Callback):
             f"in {tqdm.format_interval(elapsed)} [{rate:.3f}it/s]"
         )
         if "train_loss" in metrics:
-            tqdm.write(f"... mean training loss: {metrics['train_loss']:.4f}")
+            tqdm.write(
+                f"... mean training loss: {metrics['train_loss']:.5f} (MAE/GDL ratio: {metrics['train_loss_ratio']:.3f})"
+            )
         if "test_loss" in metrics:
-            tqdm.write(f"... mean testing loss: {metrics['test_loss']:.4f}")
+            tqdm.write(
+                f"... mean testing loss: {metrics['test_loss']:.5f} (MAE/GDL ratio: {metrics['test_loss_ratio']:.3f})"
+            )
             if metrics["test_loss"] < self.best_test_loss:
                 tqdm.write("... ✨ best testing loss so far ✨")
                 self.best_test_loss = metrics["test_loss"]
