@@ -85,10 +85,11 @@ class IAM4VPLightning(L.LightningModule):
         y_hats: list[torch.Tensor] = []
         losses: list[float] = []
 
+        # Zero the parameter gradients
+        optimizers.zero_grad()
+
         # Generate the requested number of forecasts
         for idx_forecast in range(self.model.num_forecast_steps):
-            # Zero the parameter gradients
-            optimizers.zero_grad()
 
             # Forward pass for the next time step (batch_size, channels, height, width)
             y_hat = self.model(batch_X, y_hats)
@@ -98,7 +99,6 @@ class IAM4VPLightning(L.LightningModule):
 
             # Backward pass and optimize
             self.manual_backward(loss)
-            optimizers.step()
 
             # Keep track of loss values
             losses.append(loss.detach())
@@ -106,6 +106,9 @@ class IAM4VPLightning(L.LightningModule):
 
             # Detach latest prediction to save memory before adding it to the queue
             y_hats.append(y_hat.detach())
+
+        # Run the optimiser step
+        optimizers.step()
 
         # Free up memory
         del batch_X, batch_y
