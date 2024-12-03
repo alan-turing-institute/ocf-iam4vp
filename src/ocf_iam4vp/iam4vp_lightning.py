@@ -146,8 +146,8 @@ class IAM4VPLightning(L.LightningModule):
         y_hat: torch.Tensor,
         y: torch.Tensor,
         *,
-        alpha_gdl: int = 2,
-        lambda_gdl: int = 10,
+        alpha_gdl: int = 1,
+        lambda_gdl: int = 2,
         lambda_mae: int = 1,
     ) -> torch.Tensor:
         # Mean absolute error
@@ -157,9 +157,9 @@ class IAM4VPLightning(L.LightningModule):
 
         # Gradient difference loss from https://arxiv.org/abs/1511.05440
         loss_gdl = torch.nanmean(
-            (y_hat.diff(axis=-2).abs_() - y.diff(axis=-2).abs_()).pow(alpha_gdl)
+            (y_hat.diff(axis=-2).abs_() - y.diff(axis=-2).abs_()).abs_().pow(alpha_gdl)
         ) + torch.nanmean(
-            (y_hat.diff(axis=-1).abs_() - y.diff(axis=-1).abs_()).pow(alpha_gdl)
+            (y_hat.diff(axis=-1).abs_() - y.diff(axis=-1).abs_()).abs_().pow(alpha_gdl)
         )
 
         # Return combination of two losses
