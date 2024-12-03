@@ -197,7 +197,7 @@ def train(
     )
     early_stopping_callback = EarlyEpochStopping(
         check_on_train_epoch_end=False,  # check after every validation step
-        min_delta=0.0005,
+        min_delta=0.0001,
         monitor="test_loss",
         mode="min",
         patience=3,
