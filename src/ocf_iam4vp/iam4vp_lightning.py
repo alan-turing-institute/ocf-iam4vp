@@ -226,6 +226,7 @@ class MetricsLogger(L.Callback):
         )
         self.start_time = time.perf_counter()
         self.n_batches_this_epoch = 0
+        self.n_batches_total = 0
 
     def on_train_epoch_start(
         self, trainer: L.Trainer, pl_module: L.LightningModule
@@ -240,6 +241,7 @@ class MetricsLogger(L.Callback):
         batch_idx: int,
     ) -> None:
         self.n_batches_this_epoch += 1
+        self.n_batches_total += 1
 
     def on_validation_end(self, trainer: L.Trainer, _) -> None:
         # Reset the timer
@@ -261,7 +263,7 @@ class MetricsLogger(L.Callback):
         rate = trainer.val_check_interval / elapsed
         tqdm.write(
             f"Epoch {trainer.current_epoch}: "
-            f"Processed {self.n_batches_this_epoch} batches "
+            f"Processed {self.n_batches_this_epoch} batches (total {self.n_batches_total}) "
             f"in {tqdm.format_interval(elapsed)} [{rate:.3f}it/s]"
         )
         if "train_loss" in metrics:
