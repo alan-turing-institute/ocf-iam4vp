@@ -19,6 +19,7 @@ from ocf_iam4vp import (
     IAM4VP,
     EarlyEpochStopping,
     IAM4VPLightning,
+    LossType,
     MetricsLogger,
     PlottingCallback,
 )
@@ -77,6 +78,7 @@ def train(
     batches_per_checkpoint: int,
     hidden_channels_space: int,
     hidden_channels_time: int,
+    loss_type: LossType,
     num_convolutions_space: int,
     num_convolutions_time: int,
     num_epochs: int,
@@ -175,6 +177,7 @@ def train(
             N_S=num_convolutions_space,
             N_T=num_convolutions_time,
         )
+    model.set_loss_type(loss_type)
 
     # Log parameters
     model.describe({"output_directory": output_directory})
@@ -322,6 +325,12 @@ if __name__ == "__main__":
         default=64,
     )
     parser.add_argument(
+        "--loss-type",
+        type=str,
+        help="Which loss to use",
+        default="",
+    )
+    parser.add_argument(
         "--num-convolutions-space",
         type=int,
         help="Number of spatial convolutions",
@@ -382,6 +391,7 @@ if __name__ == "__main__":
             batches_per_checkpoint=args.batches_per_checkpoint,
             hidden_channels_space=args.hidden_channels_space,
             hidden_channels_time=args.hidden_channels_time,
+            loss_type=LossType(args.loss_type.lower()),
             num_convolutions_space=args.num_convolutions_space,
             num_convolutions_time=args.num_convolutions_time,
             num_epochs=args.num_epochs,

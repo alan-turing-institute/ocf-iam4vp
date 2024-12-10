@@ -1,3 +1,4 @@
+import enum
 import time
 from typing import Any
 
@@ -13,6 +14,13 @@ from tqdm import tqdm
 from .iam4vp import IAM4VP
 
 LightningBatch = tuple[torch.Tensor, torch.Tensor]
+
+
+class LossType(enum.StrEnum):
+    MAE = enum.auto()
+    MAE_GDL_SQUARED = enum.auto()
+    MAE_GDL = enum.auto()
+    MAE_GDL_WEIGHTED = enum.auto()
 
 
 class IAM4VPLightning(L.LightningModule):
@@ -57,6 +65,10 @@ class IAM4VPLightning(L.LightningModule):
         torch.set_float32_matmul_precision("medium")
         # Set this attribute to stop the epoch early
         self.stop_epoch = False
+        # Set loss parameters
+        self.alpha_gdl = 1
+        self.lambda_gdl = 1
+        self.lambda_mae = 1
 
     def describe(self, extra_values: dict[str, str] = {}) -> None:
         print(f"... hidden_channels_space {self.hparams['hid_S']}")
@@ -72,6 +84,26 @@ class IAM4VPLightning(L.LightningModule):
         if self.stop_epoch:
             self.stop_epoch = False
             return -1
+
+    def set_loss_type(self, loss_type: LossType) -> None:
+        """Set appropriate loss parameters"""
+        print(f"Setting loss type to '{loss_type.value}'")
+        if loss_type == LossType.MAE:
+            self.alpha_gdl = 1
+            self.lambda_gdl = 0
+            self.lambda_mae = 1
+        elif loss_type == LossType.MAE_GDL_SQUARED:
+            self.alpha_gdl = 2
+            self.lambda_gdl = 10
+            self.lambda_mae = 1
+        elif loss_type == LossType.MAE_GDL_WEIGHTED:
+            self.alpha_gdl = 1
+            self.lambda_gdl = 2
+            self.lambda_mae = 1
+        elif loss_type == LossType.MAE_GDL:
+            self.alpha_gdl = 1
+            self.lambda_gdl = 1
+            self.lambda_mae = 1
 
     def training_step(self, batch: LightningBatch, batch_idx: int) -> torch.Tensor:
         # Split the batch into X and y
@@ -96,7 +128,13 @@ class IAM4VPLightning(L.LightningModule):
             y_hat = self.model(batch_X, y_hats)
 
             # Calculate the loss
-            loss, loss_ratio = self.loss(y_hat, batch_y[:, :, idx_forecast, :, :])
+            loss, loss_ratio = self.loss(
+                y_hat,
+                batch_y[:, :, idx_forecast, :, :],
+                alpha_gdl=self.alpha_gdl,
+                lambda_gdl=self.lambda_gdl,
+                lambda_mae=self.lambda_mae,
+            )
 
             # Backward pass and optimize
             self.manual_backward(loss)
@@ -130,7 +168,13 @@ class IAM4VPLightning(L.LightningModule):
         batch_y_hat = self.model.predict(batch_X)
 
         # Calculate loss
-        loss, loss_ratio = self.loss(batch_y_hat, batch_y)
+        loss, loss_ratio = self.loss(
+            batch_y_hat,
+            batch_y,
+            alpha_gdl=self.alpha_gdl,
+            lambda_gdl=self.lambda_gdl,
+            lambda_mae=self.lambda_mae,
+        )
         self.log("test_loss", loss)
         self.log("test_loss_ratio", loss_ratio)
         return loss
