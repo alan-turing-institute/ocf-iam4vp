@@ -8,9 +8,8 @@ description = "Implementation of Implicit Stacked Autoregressive Model for Video
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "cloudcasting @ git+https://github.com/alan-turing-institute/cloudcasting.git@v0.5.0",
+    "cloudcasting @ git+https://github.com/alan-turing-institute/cloudcasting.git@v0.6.0",
     "einops",
-    "jaxtyping<=0.2.34",  # workaround for a problem with cloudcasting
     "lightning",
     "matplotlib",
     "numpy",
